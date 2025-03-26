@@ -12,7 +12,7 @@ Celervus is a local standalone tool designed to process PDF books or documentati
 ## Setup
 1. **Install Dependencies**:
    ```bash
-   pip install PyPDF2 kuzu ollama groq pillow
+   pip install PyPDF2 kuzu ollama groq pillow 
    ```
 2. **Set Up Groq API Key**:
    - Get a free API key from [Groq](https://console.groq.com/docs).
