@@ -8,7 +8,16 @@ Celervus is a local standalone tool designed to process PDF books or documentati
 - Generates bullet points and flashcards with Groq's free LLM.
 - Stores content and image paths in Kuza DB with embeddings for search.
 - Links images to topics/subtopics via graph relationships.
+## Kuzu Explorer:
+docker run -p 8000:8000            -v /home/seq_amal/work_temp/Celervus_temp/Celervus_AI/kuzu_db:/database  -e MODE=READ_ONLY             --rm kuzudb/explorer:latest
+[06:43:06.386] INFO (1): Access mode: READ_ONLY
+[06:43:06.483] INFO (1): Version of Kuzu: 0.8.2
+[06:43:06.483] INFO (1): Storage version of Kuzu: 36
+[06:43:06.485] INFO (1): Deployed server started on port: 8000
 
+### Cypher query:
+   MATCH (t:Topic)<-[r:SUBTOPIC_OF]-(s:Subtopic)
+   RETURN t, s, r
 ## Setup
 1. **Install Dependencies**:
    ```bash

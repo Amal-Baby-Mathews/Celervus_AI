@@ -12,13 +12,11 @@ from dataclasses import dataclass, field
 class Topic:
     """Represents a main topic with content and metadata."""
     id: str
-    name: str
-    full_text: str
-    bullet_points: List[str] = field(default_factory=list)
-    image_metadata: List[Dict[str, str]] = field(default_factory=list)
+    name: str # Name of the topic (Main Topic of the entire pdf)
+
 
 @dataclass
-class Subtopic:
+class Subtopic:#Individual topics inside the pdf
     """Represents a subtopic linked to a main topic with content and metadata."""
     id: str
     name: str
@@ -52,9 +50,6 @@ class KuzuDBManager:
                 CREATE NODE TABLE IF NOT EXISTS Topic(
                     id STRING,
                     name STRING,
-                    text STRING,
-                    bullet_points STRING[],
-                    image_metadata STRING,
                     PRIMARY KEY (id)
                 );
             """)
@@ -93,21 +88,15 @@ class KuzuDBManager:
         :return: True if successful, False otherwise.
         """
         try:
-            image_metadata_json = json.dumps(topic.image_metadata)
             self.conn.execute(
                 """
                 MERGE (t:Topic {id: $id})
-                ON MATCH SET t.name = $name, t.text = $text, t.bullet_points = $bullet_points,
-                            t.image_metadata = $image_metadata
-                ON CREATE SET t.name = $name, t.text = $text, t.bullet_points = $bullet_points,
-                            t.image_metadata = $image_metadata
+                ON MATCH SET t.name = $name
+                ON CREATE SET t.name = $name
                 """,
                 {
                     "id": topic.id,
                     "name": topic.name,
-                    "text": topic.full_text,
-                    "bullet_points": topic.bullet_points,
-                    "image_metadata": image_metadata_json
                 }
             )
             return True
@@ -183,10 +172,7 @@ class KuzuDBManager:
                 data = response.get_next()[0]  # Assuming 't' is a dict
                 return Topic(
                     id=data["id"],
-                    name=data["name"],
-                    full_text=data["text"],
-                    bullet_points=data["bullet_points"],
-                    image_metadata=json.loads(data["image_metadata"])
+                    name=data["name"]
                 )
             return None
         except Exception as e:
@@ -231,10 +217,7 @@ if __name__ == "__main__":
     # Create a topic
     topic = Topic(
         id="t1",
-        name="Introduction",
-        full_text="This is the intro",
-        bullet_points=["- Point 1", "- Point 2"],
-        image_metadata=[{"image_path": "/path/to/img1.png", "image_name": "intro_diagram"}]
+        name="Introduction"
     )
     db_manager.create_topic(topic)
     
