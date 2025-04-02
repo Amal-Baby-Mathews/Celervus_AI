@@ -435,7 +435,18 @@ class PDFKnowledgeGraph:
                 print(f"Error retrieving subtopic details for subtopic {subtopic_id}: {e}")
                 return None
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI()
+
+origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
+app.add_middleware(
+  CORSMiddleware,
+  allow_origins=origins,
+  allow_credentials=True,
+  allow_methods=["*"],
+  allow_headers=["*"],
+)
 
 @app.post("/create_graph")
 async def create_graph(file: UploadFile = File(...)):

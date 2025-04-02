@@ -5,3 +5,4 @@ kuzu_db
 __pycache__/
 extracted_images/
 uploads/
+node_modules/
