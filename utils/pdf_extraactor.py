@@ -13,6 +13,7 @@ import aiohttp
 from sklearn.cluster import KMeans
 from sentence_transformers import SentenceTransformer
 import pytextrank
+from groq import Groq
 # Load spaCy model
 nlp = spacy.load("en_core_web_md")
 nlp.add_pipe("textrank")  # Add TextRank component to the pipeline
@@ -66,83 +67,87 @@ class PDFKnowledgeGraph:
         print(f"Finished extracting text and images from PDF.")
         return full_text, image_metadata
 
-    async def generate_title_with_grok(chunks: List[str]) -> str:
+    def generate_title_with_grok(self, chunks: List[str]) -> str:
         """Generate a title using Grok API with the given text chunks."""
         print("Generating title with Grok.")
-        prompt = "Generate a concise title (5-10 words) for the following text:\n\n" + "\n".join(chunks)
-        # Get Grok API key from environment
-        GROQ_API_KEY = os.getenv("GROQ_API")
-        if not GROQ_API_KEY:
-            raise ValueError("GROQ_API_KEY not found in environment variables")
-
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                "https://api.grok.ai/v1/generate",  # Replace with actual Grok API endpoint
-                json={
-                    "prompt": prompt,
-                    "max_tokens": 50,
-                    "temperature": 0.7
-                },
-                headers={"Authorization": f"Bearer {GROQ_API_KEY}"}
-            ) as response:
-                if response.status != 200:
-                    print(f"Grok API error: {response.status}")
-                    return "Unnamed Topic"
-                result = await response.json()
-                title = result.get("choices", [{}])[0].get("text", "Unnamed Topic").strip()
-                print(f"Grok generated title: {title}")
-                return title if title else "Unnamed Topic"
-
-    def extract_topic(self, text: str) -> str:
-        """Extract the main topic using spaCy, falling back to Grok if not applicable."""
-        print("Extracting main topic with spaCy and TextRank.")
-        doc = nlp(text[:5000])  # First 5000 characters for context
         
-        # Step 1: Try spaCy with TextRank
-        key_phrases = [phrase.text for phrase in doc._.phrases if len(phrase.text.split()) <= 5]
-        spacy_topic = key_phrases[0] if key_phrases else "Unnamed Topic"
+        # Initialize Grok client
+        client = Groq(api_key=os.environ.get("GROQ_API"))
         
-        # Step 2: Evaluate if spaCy topic is applicable
-        generic_phrases = {"introduction", "chapter", "section", "unnamed topic"}
-        is_applicable = (
-            len(spacy_topic.split()) > 1 and  # Not too short
-            spacy_topic.lower() not in generic_phrases and  # Not generic
-            any(token.pos_ in ["NOUN", "PROPN"] for token in nlp(spacy_topic))  # Contains meaningful words
+        # Well-structured prompt
+        prompt = (
+            "You are a helpful AI assistant tasked with generating a concise title for a document. "
+            "The title should be 5-10 words long, capturing the main theme of the text. "
+            "Use the following text chunks from the document to determine the title:\n\n"
+            f"{' '.join(chunks)}\n\n"
+            "Provide only the title, without any additional explanation."
         )
         
-        if is_applicable:
-            print(f"spaCy extracted topic: {spacy_topic}")
-            return spacy_topic
-        
-        # Step 3: Fall back to Grok if spaCy topic is not applicable
-        print("spaCy topic not applicable, falling back to Grok.")
-        
-        # Select key text chunks for Grok
-        # Option 1: First few paragraphs (split by double newlines)
-        paragraphs = text[:5000].split("\n\n")
-        chunks = paragraphs[:3] if len(paragraphs) >= 3 else paragraphs  # First 3 paragraphs
-        
-        # Option 2: Key sentences using TextRank
-        key_sentences = [sent.text for sent in doc._.textrank.summary(limit_sentences=3)]
-        if len(" ".join(key_sentences)) > 200:  # Ensure enough context
-            chunks = key_sentences
-        
-        # Call Grok API asynchronously
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # If running in an async context (e.g., FastAPI), use await
-                topic = loop.run_until_complete(self.generate_title_with_grok(chunks))
-            else:
-                # Otherwise, run in a new loop
-                topic = asyncio.run(self.generate_title_with_grok(chunks))
+            chat_completion = client.chat.completions.create(
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    }
+                ],
+                model="llama-3.3-70b-versatile",
+                max_tokens=50,
+                temperature=0.7,
+            )
+            title = chat_completion.choices[0].message.content.strip()
+            print(f"Grok generated title: {title}")
+            return title if title else "Unnamed Topic"
+        except Exception as e:
+            print(f"Grok API error: {e}")
+            return "Unnamed Topic"
+
+    def extract_topic(self, doc: fitz.Document) -> str:
+        """Extract the main topic by selecting chunks with larger fonts and using Grok."""
+        print("Extracting main topic with PyMuPDF and Grok.")
+        
+        # Step 1: Extract text chunks with larger font sizes from the first few pages
+        chunks = []
+        for page_num in range(min(3, len(doc))):  # Limit to first 3 pages
+            page = doc[page_num]
+            blocks = page.get_text("dict")["blocks"]
+            for block in blocks:
+                if "lines" not in block:
+                    continue
+                for line in block["lines"]:
+                    for span in line["spans"]:
+                        span_text = span["text"].strip()
+                        font_size = span["size"]
+                        font_flags = span["flags"]
+                        is_bold = font_flags & 2  # Check if bold
+                        is_larger = font_size > 12  # Larger font size
+                        is_short = len(span_text) < 100  # Short text, typical for headings
+                        
+                        # Select text that is likely a title or heading
+                        if (is_larger or is_bold) and is_short and span_text:
+                            chunks.append(span_text)
+                            if len(chunks) >= 3:  # Limit to 3 chunks for context
+                                break
+                    if len(chunks) >= 3:
+                        break
+                if len(chunks) >= 3:
+                    break
+        
+        # Fallback: If no chunks with larger fonts are found, use the first few lines
+        if not chunks:
+            page = doc[0]
+            text = page.get_text("text")[:500]  # First 500 characters
+            chunks = text.split("\n")[:3]  # First 3 lines
+        
+        # Step 2: Call Grok to generate the topic
+        try:
+            topic = self.generate_title_with_grok(chunks)
         except Exception as e:
             print(f"Error generating title with Grok: {e}")
             topic = "Unnamed Topic"
         
         print(f"Final extracted topic: {topic}")
         return topic
-
     def extract_subtopics(self, doc: fitz.Document, text: str) -> List[Dict[str, str]]:
         """Extract subtopics using PyMuPDF for structure, spaCy for validation, and embeddings for clustering."""
         print("Extracting subtopics from PDF.")
@@ -296,7 +301,7 @@ class PDFKnowledgeGraph:
         doc = fitz.open(self.pdf_path)
 
         # Extract main topic
-        topic_name = self.extract_topic(full_text)
+        topic_name = self.extract_topic(doc)
         topic_id = str(uuid.uuid4())
         print(f"Creating main topic with ID: {topic_id} and name: {topic_name}")
         main_topic = Topic(id=topic_id, name=topic_name)
