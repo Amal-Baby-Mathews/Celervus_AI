@@ -48,3 +48,15 @@ MIT License - feel free to use, modify, and distribute.
 
 ## Contributing
 Contributions welcome! Fork the repo, make changes, and submit a pull request.
+
+## To Do:
+- Improve the summarization logic to generate more concise and accurate summaries.
+- Enable Groq to create detailed and context-aware bullet points.
+- Enhance the algorithm for generating subtopic names to ensure they are more descriptive and relevant.
+- Increase the content size provided to the LLM for creating bullet points to improve its performance and contextual understanding.
+- Optimize the integration with Groq for better handling of large documents.
+- Add support for customizing the level of detail in the generated summaries and flashcards.
+- Implement a fallback mechanism for cases where the LLM fails to generate meaningful output.
+- Include error handling and logging for Groq API interactions.
+- Test and validate the tool with a variety of PDF documents to ensure robustness.
+- Update the documentation with examples and best practices for using the tool effectively.
