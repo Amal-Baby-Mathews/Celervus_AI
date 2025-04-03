@@ -32,7 +32,7 @@ async def create_graph(file: UploadFile = File(...)):
         os.makedirs(output_dir)
     
     kg = PDFKnowledgeGraph(pdf_path=pdf_path, output_dir=output_dir)
-    kg.build_knowledge_graph()
+    await kg.build_knowledge_graph(max_subtopics=5)
     
     # Store metadata for each topic created (assuming build_knowledge_graph populates topics)
     topics = kg.get_all_topics()
