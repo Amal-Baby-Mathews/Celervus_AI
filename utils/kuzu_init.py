@@ -209,6 +209,89 @@ class KuzuDBManager:
         except Exception as e:
             print(f"Error retrieving subtopics for topic {topic_id}: {e}")
             return []
+        
+    def create_nested_subtopic(self, parent_id: str, subtopic: Subtopic, position: int = 0, 
+                            parent_type: str = "Topic") -> bool:
+        """
+        Create a subtopic and link it to a parent (which can be either a Topic or another Subtopic).
+        This enables creating a hierarchical tree of topics and nested subtopics.
+
+        :param parent_id: ID of the parent (either Topic or Subtopic)
+        :param subtopic: Subtopic object to create and link
+        :param position: Order of the subtopic within its parent (default 0)
+        :param parent_type: Type of the parent node ("Topic" or "Subtopic", default "Topic")
+        :return: True if successful, False otherwise
+        """
+        try:
+            # First, ensure we have the SUBTOPIC_OF_SUBTOPIC relationship table
+            try:
+                self.conn.execute("""
+                    CREATE REL TABLE IF NOT EXISTS SUBTOPIC_OF_SUBTOPIC(
+                        FROM Subtopic TO Subtopic,
+                        position UINT32
+                    );
+                """)
+            except Exception as e:
+                print(f"Error creating SUBTOPIC_OF_SUBTOPIC relationship table: {e}")
+                return False
+                
+            # Prepare the subtopic data
+            image_metadata_json = json.dumps(subtopic.image_metadata)
+            
+            # Create the subtopic node regardless of parent type
+            self.conn.execute(
+                """
+                MERGE (s:Subtopic {id: $subtopic_id})
+                ON MATCH SET s.name = $name, s.text = $text, s.bullet_points = $bullet_points,
+                            s.image_metadata = $image_metadata
+                ON CREATE SET s.name = $name, s.text = $text, s.bullet_points = $bullet_points,
+                            s.image_metadata = $image_metadata
+                """,
+                {
+                    "subtopic_id": subtopic.id,
+                    "name": subtopic.name,
+                    "text": subtopic.full_text,
+                    "bullet_points": subtopic.bullet_points,
+                    "image_metadata": image_metadata_json
+                }
+            )
+            
+            # Connect the subtopic to its parent based on parent type
+            if parent_type == "Topic":
+                self.conn.execute(
+                    """
+                    MATCH (s:Subtopic {id: $subtopic_id})
+                    MATCH (t:Topic {id: $parent_id})
+                    MERGE (s)-[r:SUBTOPIC_OF]->(t)
+                    ON MATCH SET r.position = $position
+                    ON CREATE SET r.position = $position
+                    """,
+                    {
+                        "subtopic_id": subtopic.id,
+                        "parent_id": parent_id,
+                        "position": position
+                    }
+                )
+            else:  # parent_type == "Subtopic"
+                self.conn.execute(
+                    """
+                    MATCH (s:Subtopic {id: $subtopic_id})
+                    MATCH (p:Subtopic {id: $parent_id})
+                    MERGE (s)-[r:SUBTOPIC_OF_SUBTOPIC]->(p)
+                    ON MATCH SET r.position = $position
+                    ON CREATE SET r.position = $position
+                    """,
+                    {
+                        "subtopic_id": subtopic.id,
+                        "parent_id": parent_id,
+                        "position": position
+                    }
+                )
+                
+            return True
+        except Exception as e:
+            print(f"Error creating nested subtopic {subtopic.id} under {parent_type} {parent_id}: {e}")
+            return False
 
 # Example Usage
 if __name__ == "__main__":
