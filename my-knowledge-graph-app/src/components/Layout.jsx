@@ -25,12 +25,13 @@ const Layout = () => {
               <NavLink to="/" className={navLinkClass}>
                 <Home size={20} className="mr-1 sm:mr-2" /> Home
               </NavLink>
-              <NavLink to="/topics" className={navLinkClass}>
-                <Network size={20} className="mr-1 sm:mr-2" /> View Topics
-              </NavLink>
               <NavLink to="/upload" className={navLinkClass}>
                 <Upload size={20} className="mr-1 sm:mr-2" /> Upload PDF
               </NavLink>
+              <NavLink to="/topics" className={navLinkClass}>
+                <Network size={20} className="mr-1 sm:mr-2" /> View Topics
+              </NavLink>
+              
             </div>
           </div>
         </div>
