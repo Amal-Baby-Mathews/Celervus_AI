@@ -227,7 +227,12 @@ if __name__ == "__main__":
         name="Section 1.1",
         full_text="Subtopic text",
         bullet_points=["- Subpoint 1"],
-        image_metadata=[{"image_path": "/path/to/subimg1.png", "image_name": "sub_diagram"}]
+        image_metadata=[{
+            "image_path": "/path/to/subimg1.png",
+            "image_name": "sub_diagram",
+            "page_number": "1",
+            "url": "/images/pdf_name/sub_diagram.png"
+        }]
     )
     db_manager.create_and_link_subtopic("t1", subtopic, position=1)
     

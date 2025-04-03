@@ -1,5 +1,5 @@
-// src/components/FileUpload.jsx
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import { motion, AnimatePresence } from 'framer-motion';
 import { createGraphFromPDF } from '../services/api';
 import { UploadCloud, FileText, AlertCircle, CheckCircle, Loader } from 'lucide-react';
@@ -9,6 +9,7 @@ const FileUpload = () => {
   const [status, setStatus] = useState('idle'); // idle, uploading, success, error
   const [message, setMessage] = useState('');
   const [dragOver, setDragOver] = useState(false);
+  const navigate = useNavigate(); // Hook for navigation
 
   const handleFileChange = (event) => {
     const file = event.target.files[0];
@@ -38,6 +39,19 @@ const FileUpload = () => {
       setStatus('success');
       setMessage(response.data.message || 'Graph created successfully!');
       setSelectedFile(null); // Clear selection on success
+
+      // Redirect to /topics with the first topic ID (if available)
+      const topics = response.data.topics || [];
+      if (topics.length > 0) {
+        const firstTopicId = topics[0].id;
+        setTimeout(() => {
+          navigate('/topics', { state: { selectedTopicId: firstTopicId } });
+        }, 1000); // Delay for user to see success message
+      } else {
+        setTimeout(() => {
+          navigate('/topics');
+        }, 1000); // Fallback to /topics without pre-selection
+      }
     } catch (error) {
       setStatus('error');
       setMessage(error.response?.data?.detail || error.message || 'An error occurred during upload.');
@@ -45,34 +59,33 @@ const FileUpload = () => {
     }
   };
 
-   const handleDrop = (event) => {
+  const handleDrop = (event) => {
     event.preventDefault();
     event.stopPropagation();
     setDragOver(false);
     const file = event.dataTransfer.files[0];
-     if (file && file.type === 'application/pdf') {
-       setSelectedFile(file);
-       setStatus('idle');
-       setMessage('');
-     } else {
-       setSelectedFile(null);
-       setStatus('error');
-       setMessage('Please drop a PDF file.');
-     }
-   };
+    if (file && file.type === 'application/pdf') {
+      setSelectedFile(file);
+      setStatus('idle');
+      setMessage('');
+    } else {
+      setSelectedFile(null);
+      setStatus('error');
+      setMessage('Please drop a PDF file.');
+    }
+  };
 
-   const handleDragOver = (event) => {
-     event.preventDefault();
-     event.stopPropagation();
-     setDragOver(true);
-   };
+  const handleDragOver = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setDragOver(true);
+  };
 
-   const handleDragLeave = (event) => {
-     event.preventDefault();
-     event.stopPropagation();
-     setDragOver(false);
-   };
-
+  const handleDragLeave = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setDragOver(false);
+  };
 
   return (
     <motion.div
@@ -83,7 +96,7 @@ const FileUpload = () => {
     >
       <div
         className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors duration-200 ${
-           dragOver ? 'border-primary bg-primary/10' : 'border-gray-300 hover:border-primary'
+          dragOver ? 'border-primary bg-primary/10' : 'border-gray-300 hover:border-primary'
         }`}
         onClick={() => document.getElementById('fileInput').click()}
         onDrop={handleDrop}
@@ -105,7 +118,7 @@ const FileUpload = () => {
           </div>
         ) : (
           <p className="text-text-muted">
-             {dragOver ? 'Drop the PDF file here' : 'Drag & drop a PDF file here, or click to select'}
+            {dragOver ? 'Drop the PDF file here' : 'Drag & drop a PDF file here, or click to select'}
           </p>
         )}
       </div>
@@ -144,7 +157,7 @@ const FileUpload = () => {
           </>
         ) : (
           <>
-             <UploadCloud size={20} className="mr-2"/> Upload & Create Graph
+            <UploadCloud size={20} className="mr-2" /> Upload & Create Graph
           </>
         )}
       </motion.button>

@@ -3,10 +3,10 @@ import json
 import os
 import uuid
 import fitz  # PyMuPDF for PDF processing
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from dataclasses import dataclass, field
 from kuzu_init import KuzuDBManager, Topic, Subtopic  # Import from your provided script
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, HTTPException
 import uvicorn
 import spacy
 import aiohttp
@@ -27,11 +27,7 @@ class PDFKnowledgeGraph:
     def __post_init__(self):
         """Initialize output directory and validate PDF path."""
         print(f"Initializing PDFKnowledgeGraph for PDF: {self.pdf_path}")
-        if not os.path.exists(self.pdf_path):
-            print("Not using a PDF for querying")
-        if not os.path.exists(self.output_dir):
-            print(f"Output directory {self.output_dir} does not exist. Creating it.")
-            os.makedirs(self.output_dir)
+
 
     def extract_text_and_images(self) -> tuple[str, List[Dict[str, str]]]:
         """Extract full text and images from the PDF, saving images to output_dir."""
@@ -295,7 +291,13 @@ class PDFKnowledgeGraph:
     def build_knowledge_graph(self) -> None:
         """Extract topic/subtopics from PDF and build the knowledge graph."""
         print("Starting to build the knowledge graph.")
-        
+        # Validate PDF path and output directory
+        if not self.pdf_path or not os.path.exists(self.pdf_path):
+            raise ValueError(f"Invalid PDF path: {self.pdf_path}")
+        if not self.output_dir:
+            raise ValueError("Output directory cannot be null.")
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
         # Extract text and images
         full_text, image_metadata = self.extract_text_and_images()
         doc = fitz.open(self.pdf_path)
@@ -314,11 +316,16 @@ class PDFKnowledgeGraph:
             print(f"Creating subtopic {position + 1}/{len(subtopics_data)} with ID: {subtopic_id}")
             bullet_points = self.generate_bullet_points(subtopic_data["text"])
             
-            # Assign images to subtopics based on page range
+            # Assign images to subtopics based on page range and define URL here
             start_page = subtopic_data["start_page"]
             end_page = subtopic_data["end_page"]
             subtopic_images = [
-                img for img in image_metadata
+                {
+                    "image_path": img["image_path"],
+                    "image_name": img["image_name"],
+                    "page_number": img["page_number"],
+                    "url": f"/images/{os.path.basename(self.output_dir)}/{img['image_name']}"
+                } for img in image_metadata
                 if start_page <= int(img["page_number"]) <= end_page
             ]
 
@@ -333,46 +340,19 @@ class PDFKnowledgeGraph:
         
         doc.close()
         print("Knowledge graph construction completed.")
-    def get_all_topics(self) -> List[Dict[str, any]]:
-        """
-        Retrieve all topics with their subtopics for frontend display.
-
-        :return: List of dictionaries containing topic details and their subtopics.
-        """
+    def get_all_topics(self) -> List[Dict[str, Any]]:
         try:
             response = self.db_manager.conn.execute("MATCH (t:Topic) RETURN t ORDER BY t.name")
             topics = []
             while response.has_next():
                 topic_data = response.get_next()[0]
-                topic_id = topic_data["id"]
-                topic = self.db_manager.get_topic(topic_id)
-                if topic:
-                    subtopics = self.db_manager.get_subtopics(topic_id)
-                    topics.append({
-                        "id": topic.id,
-                        "name": topic.name,
-                        "subtopics": [
-                            {
-                                "id": subtopic.id,
-                                "name": subtopic.name,
-                                "full_text": subtopic.full_text,
-                                "bullet_points": subtopic.bullet_points,
-                                "image_metadata": subtopic.image_metadata
-                            } for subtopic in subtopics
-                        ]
-                    })
+                topics.append({"id": topic_data["id"], "name": topic_data["name"]})
             return topics
         except Exception as e:
-            print(f"Error retrieving all topics: {e}")
+            print(f"Error retrieving topics: {e}")
             return []
 
-    def get_topic_details(self, topic_id: str) -> Optional[Dict[str, any]]:
-        """
-        Retrieve a specific topic and its subtopics by topic ID for frontend display.
-
-        :param topic_id: ID of the topic to retrieve.
-        :return: Dictionary containing topic details and its subtopics, or None if not found.
-        """
+    def get_topic_details(self, topic_id: str) -> Optional[Dict[str, Any]]:
         try:
             topic = self.db_manager.get_topic(topic_id)
             if not topic:
@@ -387,64 +367,79 @@ class PDFKnowledgeGraph:
                         "name": subtopic.name,
                         "full_text": subtopic.full_text,
                         "bullet_points": subtopic.bullet_points,
-                        "image_metadata": subtopic.image_metadata
+                        "image_metadata": [
+                            {
+                                "image_path": img["image_path"],
+                                "image_name": img["image_name"],
+                                "page_number": img["page_number"],
+                                "url": img["url"]
+                            } for img in subtopic.image_metadata
+                        ]
                     } for subtopic in subtopics
                 ]
             }
         except Exception as e:
-            print(f"Error retrieving topic details for topic {topic_id}: {e}")
+            print(f"Error retrieving topic {topic_id}: {e}")
             return None
 
     def get_subtopic_details(self, subtopic_id: str) -> Optional[Dict[str, any]]:
-            try:
-                response = self.db_manager.conn.execute(
-                    "MATCH (s:Subtopic {id: $id}) RETURN s",
-                    {"id": subtopic_id}
+        try:
+            response = self.db_manager.conn.execute(
+                "MATCH (s:Subtopic {id: $id}) RETURN s",
+                {"id": subtopic_id}
+            )
+            if response.has_next():
+                s_data = response.get_next()[0]
+                subtopic = Subtopic(
+                    id=s_data["id"],
+                    name=s_data["name"],
+                    full_text=s_data["text"],
+                    bullet_points=s_data["bullet_points"],
+                    image_metadata=json.loads(s_data["image_metadata"])
                 )
-                if response.has_next():
-                    s_data = response.get_next()[0]
-                    subtopic = Subtopic(
-                        id=s_data["id"],
-                        name=s_data["name"],
-                        full_text=s_data["text"],
-                        bullet_points=s_data["bullet_points"],
-                        image_metadata=json.loads(s_data["image_metadata"])
-                    )
-                else:
-                    return None
-                
-                topic_response = self.db_manager.conn.execute(
-                    "MATCH (s:Subtopic {id: $id})-[:SUBTOPIC_OF]->(t:Topic) RETURN t",
-                    {"id": subtopic_id}
-                )
-                if topic_response.has_next():
-                    t_data = topic_response.get_next()[0]
-                    topic = {
-                        "id": t_data["id"],
-                        "name": t_data["name"]
-                    }
-                else:
-                    topic = None
-                
-                return {
-                    "subtopic": {
-                        "id": subtopic.id,
-                        "name": subtopic.name,
-                        "full_text": subtopic.full_text,
-                        "bullet_points": subtopic.bullet_points,
-                        "image_metadata": subtopic.image_metadata
-                    },
-                    "topic": topic
-                }
-            except Exception as e:
-                print(f"Error retrieving subtopic details for subtopic {subtopic_id}: {e}")
+            else:
                 return None
+            
+            topic_response = self.db_manager.conn.execute(
+                "MATCH (s:Subtopic {id: $id})-[:SUBTOPIC_OF]->(t:Topic) RETURN t",
+                {"id": subtopic_id}
+            )
+            if topic_response.has_next():
+                t_data = topic_response.get_next()[0]
+                topic = {
+                    "id": t_data["id"],
+                    "name": t_data["name"]
+                }
+            else:
+                topic = None
+            
+            return {
+                "subtopic": {
+                    "id": subtopic.id,
+                    "name": subtopic.name,
+                    "full_text": subtopic.full_text,
+                    "bullet_points": subtopic.bullet_points,
+                    "image_metadata": [
+                        {
+                            "image_path": subtopic.image_metadata[i]["image_path"],
+                            "image_name": subtopic.image_metadata[i]["image_name"],
+                            "page_number": subtopic.image_metadata[i]["page_number"],
+                            "url": f"/images/{t_data["name"]}/{subtopic.image_metadata[i]['image_name']}"
+                        } for i in range(len(subtopic.image_metadata))
+                    ]
+                },
+                "topic": topic
+            }
+        except Exception as e:
+            print(f"Error retrieving subtopic details for subtopic {subtopic_id}: {e}")
+            return None
 
 from fastapi.middleware.cors import CORSMiddleware
-
+from fastapi.staticfiles import StaticFiles
 app = FastAPI()
-
-origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
+# Mount static files directory for images
+app.mount("/images", StaticFiles(directory="extracted_images"), name="images")
+origins = ["http://localhost:5173", "http://127.0.0.1:5173","*"]
 app.add_middleware(
   CORSMiddleware,
   allow_origins=origins,
@@ -452,6 +447,9 @@ app.add_middleware(
   allow_methods=["*"],
   allow_headers=["*"],
 )
+
+# In-memory store for PDF metadata (replace with DB in production)
+pdf_metadata: Dict[str, Dict[str, str]] = {}  # {topic_id: {"pdf_path": "...", "output_dir": "..."}}
 
 @app.post("/create_graph")
 async def create_graph(file: UploadFile = File(...)):
@@ -469,25 +467,36 @@ async def create_graph(file: UploadFile = File(...)):
     
     kg = PDFKnowledgeGraph(pdf_path=pdf_path, output_dir=output_dir)
     kg.build_knowledge_graph()
-    return {"message": "Graph created successfully"}
+    
+    # Store metadata for each topic created (assuming build_knowledge_graph populates topics)
+    topics = kg.get_all_topics()
+    for topic in topics:
+        topic_id = topic["id"]
+        pdf_metadata[topic_id] = {"pdf_path": pdf_path, "output_dir": output_dir}
+    
+    return {"message": "Graph created successfully", "topics": topics}
 
 @app.get("/topics")
 def get_all_topics():
-    kg = PDFKnowledgeGraph(pdf_path="dummy_path", output_dir="dummy_dir")
-    topics = kg.get_all_topics()
-    return topics
+    kg = PDFKnowledgeGraph(pdf_path="", output_dir="")
+    return kg.get_all_topics()
 
 @app.get("/topics/{topic_id}")
 def get_topic_details(topic_id: str):
-    kg = PDFKnowledgeGraph(pdf_path="dummy_path", output_dir="dummy_dir")
+    kg = PDFKnowledgeGraph(pdf_path="", output_dir="")
     details = kg.get_topic_details(topic_id)
+    if not details:
+        raise HTTPException(status_code=404, detail=f"Topic {topic_id} not found")
     return details
-
 @app.get("/subtopics/{subtopic_id}")
 def get_subtopic_details(subtopic_id: str):
-    kg = PDFKnowledgeGraph(pdf_path="dummy_path", output_dir="dummy_dir")
-    details = kg.get_subtopic_details(subtopic_id)
-    return details
+    # Find the topic_id associated with this subtopic_id
+    for topic_id, meta in pdf_metadata.items():
+        kg = PDFKnowledgeGraph(pdf_path=meta["pdf_path"], output_dir=meta["output_dir"])
+        details = kg.get_subtopic_details(subtopic_id)
+        if details:
+            return details
+    return {"error": f"Subtopic {subtopic_id} not found"}, 404
 # Example Usage
 if __name__ == "__main__":
     # Commenting out the example usage and serving the FastAPI app
