@@ -122,7 +122,8 @@ class PDFKnowledgeGraph:
                 max_tokens=400,  # Increased for potentially longer bullet point lists
                 temperature=0.7,
             )
-            result = chat_completion.choices[0].message.content.strip()
+            content = chat_completion.choices[0].message.content
+            result = content.strip() if content else "[No content returned by Groq API]"
             return result
         except Exception as e:
             print(f"Groq API error: {e}")
