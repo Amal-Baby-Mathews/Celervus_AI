@@ -491,7 +491,7 @@ class PDFKnowledgeGraph:
         )
 
         try:
-            result = self.generate_text_with_groq(prompt, max_tokens=500) # Allow more tokens for bullets
+            result = self.generate_text_with_groq(prompt) # Allow more tokens for bullets
 
             # Attempt to parse JSON first (if using JSON prompt)
             # try:
@@ -530,7 +530,7 @@ class PDFKnowledgeGraph:
         """Generate bullet points for multiple subtopics concurrently. (Async helper)"""
         # Note: BATCH_SIZE here controls concurrency of asyncio tasks,
         # not necessarily batching to the Groq API itself (unless the API supports it).
-        BATCH_SIZE = 5  # Number of concurrent Groq calls
+        BATCH_SIZE = 2  # Number of concurrent Groq calls
         all_bullet_points = []
         semaphore = asyncio.Semaphore(BATCH_SIZE) # Limit concurrency
 

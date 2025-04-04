@@ -60,3 +60,70 @@ Contributions welcome! Fork the repo, make changes, and submit a pull request.
 - Include error handling and logging for Groq API interactions.
 - Test and validate the tool with a variety of PDF documents to ensure robustness.
 - Update the documentation with examples and best practices for using the tool effectively.
+## LLM Integration
+
+To make the tool flexible and allow the use of different LLM sources (e.g., Groq, OpenRouter, etc.), you can implement a modular approach for LLM integration. Below is an outline of how to achieve this:
+
+### Steps to Integrate Multiple LLM Sources
+
+1. **Abstract LLM Interaction**:
+   Create a Python module (e.g., `llm_handler.py`) that defines a common interface for interacting with different LLMs. For example:
+   ```python
+   class LLMHandler:
+       def __init__(self, llm_type, api_key):
+           self.llm_type = llm_type
+           self.api_key = api_key
+
+       def generate_summary(self, text):
+           if self.llm_type == "groq":
+               return self._use_groq(text)
+           elif self.llm_type == "openrouter":
+               return self._use_openrouter(text)
+           else:
+               raise ValueError("Unsupported LLM type")
+
+       def _use_groq(self, text):
+           # Add Groq-specific API call logic here
+           pass
+
+       def _use_openrouter(self, text):
+           # Add OpenRouter-specific API call logic here
+           pass
+   ```
+
+2. **Environment Configuration**:
+   Allow users to specify the LLM source and API key via environment variables:
+   ```bash
+   export LLM_TYPE='groq'  # or 'openrouter'
+   export LLM_API_KEY='your-api-key'
+   ```
+
+3. **Dynamic LLM Selection**:
+   Update the main script to dynamically select the LLM source based on the environment variables:
+   ```python
+   import os
+   from llm_handler import LLMHandler
+
+   llm_type = os.getenv("LLM_TYPE", "groq")
+   api_key = os.getenv("LLM_API_KEY")
+
+   llm_handler = LLMHandler(llm_type, api_key)
+
+   # Example usage
+   summary = llm_handler.generate_summary("Your input text here")
+   print(summary)
+   ```
+
+4. **Extend Support for New LLMs**:
+   Add new methods in `LLMHandler` for additional LLM sources as needed.
+
+### Benefits
+- **Flexibility**: Easily switch between LLMs without modifying the core logic.
+- **Scalability**: Add support for new LLMs with minimal changes.
+- **User-Friendly**: Configure LLM preferences via environment variables.
+
+### To Do
+- Implement and test the `LLMHandler` class with Groq and OpenRouter.
+- Add error handling for API failures and invalid configurations.
+- Document the setup process for each supported LLM.
+
