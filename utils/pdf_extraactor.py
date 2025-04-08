@@ -13,6 +13,7 @@ from sklearn.cluster import KMeans
 from sentence_transformers import SentenceTransformer
 import pytextrank
 from groq import Groq
+from celerbud import BAMLFunctions  # Assuming BAMLFunctions is defined in baml.py
 # Load spaCy model
 nlp = spacy.load("en_core_web_md")
 nlp.add_pipe("textrank")  # Add TextRank component to the pipeline
@@ -25,6 +26,8 @@ class PDFKnowledgeGraph:
     db_manager: KuzuDBManager = field(default_factory=lambda: KuzuDBManager(db_path="./kuzu_db"))
 
     def __post_init__(self):
+        # Instantiate BAMLFunctions
+        self.baml = BAMLFunctions()
         """Initialize output directory and validate PDF path."""
         print(f"Initializing PDFKnowledgeGraph for PDF: {self.pdf_path}")
 
@@ -49,10 +52,11 @@ class PDFKnowledgeGraph:
             os.makedirs(self.output_dir)
             print(f"Created missing output directory: {self.output_dir}")
 
-        for page_num, page in enumerate(doc):
+        for page_num in range(len(doc)):  # Replace enumerate(doc)
+            page = doc[page_num]  # Explicitly access page by index
             print(f"Processing page {page_num + 1}/{len(doc)}")
             try:
-                page_text = page.get_text("text")
+                page_text = page.get_text("text") # type: ignore[attr-defined]
                 if page_text:
                     full_text += page_text + "\n"
             except Exception as e:
@@ -131,55 +135,43 @@ class PDFKnowledgeGraph:
             return f"[Groq API Error: {e}]" # Return error info
 
     def generate_title_with_groq(self, chunks: List[str]) -> str:
-        """Generate a title using Groq API with the given text chunks."""
-        print("Generating title with Groq.")
-        if not chunks:
-            print("Warning: No text chunks provided for title generation.")
-            return "Unnamed Topic (No Input)"
+            """Generate a title using BAML instead of Groq API with the given text chunks."""
+            print("Generating title with BAML.")
+            if not chunks:
+                print("Warning: No text chunks provided for title generation.")
+                return "Unnamed Topic (No Input)"
 
-        # Ensure chunks are strings and join them safely
-        safe_chunks = " ".join([str(chunk) for chunk in chunks if chunk])
-        if not safe_chunks.strip():
-             print("Warning: Text chunks for title generation are empty after cleaning.")
-             return "Unnamed Topic (Empty Input)"
+            # Ensure chunks are strings and join them safely
+            safe_chunks = " ".join([str(chunk) for chunk in chunks if chunk])
+            if not safe_chunks.strip():
+                print("Warning: Text chunks for title generation are empty after cleaning.")
+                return "Unnamed Topic (Empty Input)"
 
-        prompt = (
-            "You are a helpful AI assistant tasked with generating a concise title for a document. "
-            "The title should be 5-10 words long, capturing the main theme of the text. "
-            "Use the following text chunks from the document to determine the title:\n\n"
-            f"{safe_chunks[:2000]}\n\n" # Limit prompt length
-            "Provide only the title, without any additional explanation."
-        )
-
-        title = self.generate_text_with_groq(prompt)
-        # Basic cleaning of the title
-        title = title.strip().replace('"', '').replace("Title: ", "").replace("title: ", "")
-        print(f"Groq generated title: {title}")
-        return title if title else "Unnamed Topic (Generation Failed)"
+            # Use specific BAML function with limited input
+            title = self.baml.generate_document_title(text_chunks=safe_chunks[:2000])
+            
+            # Basic cleaning of the title
+            title = title.strip().replace('"', '').replace("Title: ", "").replace("title: ", "")
+            print(f"BAML generated title: {title}")
+            return title if title else "Unnamed Topic (Generation Failed)"
 
 
     def generate_subtopic_name_with_groq(self, subtopic_text: str) -> str:
-        """Generate a descriptive name for a subtopic using Groq API."""
-        print("Generating subtopic name with Groq.")
+        """Generate a descriptive name for a subtopic using BAML instead of Groq API."""
+        print("Generating subtopic name with BAML.")
 
         # Extract first 500 characters for context
         text_sample = subtopic_text[:500].strip()
         if not text_sample:
-             print("Warning: Subtopic text sample is empty.")
-             return "Unnamed Subtopic (Empty Input)"
+            print("Warning: Subtopic text sample is empty.")
+            return "Unnamed Subtopic (Empty Input)"
 
-        prompt = (
-            "You are a helpful AI assistant tasked with generating a concise, descriptive name for a subtopic. "
-            "The name should be 3-7 words long, capturing the key theme or subject matter. "
-            "Use the following text excerpt from the subtopic to determine an appropriate name:\n\n"
-            f"{text_sample}\n\n"
-            "Provide only the subtopic name, without any additional explanation or leading/trailing punctuation."
-        )
-
-        name = self.generate_text_with_groq(prompt)
+        # Use specific BAML function
+        name = self.baml.generate_subtopic_name(subtopic_text=text_sample)
+        
         # Basic cleaning of the name
-        name = name.strip().strip('."').replace("Subtopic Name: ", "").replace("subtopic name: ", "")
-        print(f"Groq generated subtopic name: {name}")
+        name = name.strip('."').replace("Subtopic Name: ", "").replace("subtopic name: ", "")
+        print(f"BAML generated subtopic name: {name}")
         return name if name else "Unnamed Subtopic (Generation Failed)"
 
     def extract_topic(self, doc: fitz.Document) -> str:
@@ -189,7 +181,7 @@ class PDFKnowledgeGraph:
         try:
             for page_num in range(min(3, len(doc))):  # Limit to first 3 pages
                 page = doc[page_num]
-                blocks = page.get_text("dict", flags=fitz.TEXTFLAGS_TEXT)["blocks"] # Ensure text flags are set if needed
+                blocks = page.get_text("dict", flags=fitz.TEXTFLAGS_TEXT)["blocks"] # type: ignore[attr-defined]
                 for block in blocks:
                     if block.get("type") == 0: # Text block
                         for line in block.get("lines", []):
@@ -217,7 +209,7 @@ class PDFKnowledgeGraph:
             if not chunks:
                 print("No prominent text chunks found, using first few lines as fallback.")
                 page = doc[0]
-                text = page.get_text("text")[:500]  # First 500 characters
+                text = page.get_text("text")[:500]  # First 500 characters# type: ignore[attr-defined]
                 # Split lines and filter empty ones
                 first_lines = [line.strip() for line in text.split("\n") if line.strip()]
                 chunks = first_lines[:5] # Take up to 5 non-empty lines
@@ -228,7 +220,7 @@ class PDFKnowledgeGraph:
             if not chunks:
                  try:
                      page = doc[0]
-                     text = page.get_text("text")[:500]
+                     text = page.get_text("text")[:500]# type: ignore[attr-defined]
                      first_lines = [line.strip() for line in text.split("\n") if line.strip()]
                      chunks = first_lines[:5]
                  except Exception as fallback_e:
@@ -263,7 +255,7 @@ class PDFKnowledgeGraph:
             for page_num in range(max_pages_for_subtopics):
                 last_page_processed = page_num
                 page = doc[page_num]
-                blocks = page.get_text("dict", flags=fitz.TEXTFLAGS_TEXT)["blocks"]
+                blocks = page.get_text("dict", flags=fitz.TEXTFLAGS_TEXT)["blocks"]# type: ignore[attr-defined]
                 page_content_added = False # Track if content from this page was added
 
                 for block in blocks:
@@ -439,93 +431,42 @@ class PDFKnowledgeGraph:
 
 
     def check_subtopic_relevance(self, text: str) -> float:
-        """Check if a subtopic is relevant and substantial using Groq API."""
+        """Check if a subtopic is relevant and substantial using BAML instead of Groq API."""
         # Take a sample of text if it's too long
         text_sample = text[:1000].strip() if len(text) > 1000 else text.strip()
-        if len(text_sample) < 50: # Too short to be relevant
-             return 0.1
-
-        prompt = (
-            "You are evaluating the relevance and substantiality of a potential subtopic text segment. "
-            "On a scale from 0.0 to 1.0, rate how relevant and informative this text is as a distinct subtopic. "
-            "Consider if it contains meaningful information, discusses a coherent theme, is not just boilerplate/formatting/references, and has sufficient detail. "
-            "Text that is only a few disconnected sentences or purely navigational should score low. Substantial discussion should score high.\n\n"
-            f"Text to evaluate:\n```\n{text_sample}\n```\n\n"
-            "Respond with ONLY a single decimal number between 0.0 and 1.0."
-        )
+        if len(text_sample) < 50:  # Too short to be relevant
+            return 0.1
 
         try:
-            result = self.generate_text_with_groq(prompt)
-            # Extract numeric score from response more reliably
-            score_match = re.search(r'(\d\.\d+)', result) # Look specifically for digit.digit+
-            if not score_match:
-                 score_match = re.search(r'(\d)', result) # Fallback to single digit if necessary
-
-            if score_match:
-                score = float(score_match.group(1))
-                score = max(0.0, min(1.0, score)) # Clamp score to [0.0, 1.0]
-                print(f"  Relevance score: {score:.2f}")
-                return score
-            else:
-                 print(f"  Warning: Could not parse relevance score from Groq response: '{result}'. Defaulting to 0.5.")
-                 return 0.5  # Default middle score if extraction fails
+            # Use specific BAML function
+            score = self.baml.check_subtopic_relevance(text=text_sample)
+            score = max(0.0, min(1.0, score))  # Clamp score to [0.0, 1.0]
+            print(f"  Relevance score: {score:.2f}")
+            return score
         except Exception as e:
-            print(f"Error checking subtopic relevance: {e}")
+            print(f"Error checking subtopic relevance with BAML: {e}")
             return 0.5  # Default middle score on error
 
 
     async def generate_bullet_points_for_subtopic(self, subtopic_text: str) -> List[str]:
-        """Generate bullet points for a single subtopic. (Async helper)"""
+        """Generate bullet points for a single subtopic using BAML (Async helper)."""
         # Limit text length to avoid token limits and reduce cost/time
         text_to_summarize = subtopic_text[:3000].strip() if len(subtopic_text) > 3000 else subtopic_text.strip()
 
-        if len(text_to_summarize) < 50: # Not enough text to summarize
+        if len(text_to_summarize) < 50:  # Not enough text to summarize
             return ["- Too short to summarize."]
 
-        prompt = (
-            "Summarize the following text into 3-5 concise, informative bullet points. "
-            "Each bullet point should capture a key concept, finding, or conclusion from the text. "
-            "Focus on the most important information. Start each bullet point with '- '. \n\n"
-            f"Text to summarize:\n```\n{text_to_summarize}\n```\n\n"
-            "Provide only the bullet points, each on a new line, starting with '- '."
-            # "Format your response as a JSON list of strings, like [\"- Point 1\", \"- Point 2\"]." # JSON can be less reliable for LLMs
-        )
-
+        # Use BAML's extract_bullet_points (unchanged from previous version)
         try:
-            result = self.generate_text_with_groq(prompt) # Allow more tokens for bullets
-
-            # Attempt to parse JSON first (if using JSON prompt)
-            # try:
-            #     bullet_points = json.loads(result)
-            #     if isinstance(bullet_points, list) and all(isinstance(item, str) for item in bullet_points):
-            #          # Optional: ensure they start with '-' or add it
-            #         return [f"- {bp.lstrip('- ')}" if not bp.startswith("- ") else bp for bp in bullet_points]
-            # except json.JSONDecodeError:
-            #     print(f"  Groq did not return valid JSON for bullet points. Raw response: {result[:100]}...")
-            #     # Fall through to manual extraction
-
-            # Manual extraction based on '- ' prefix
-            lines = result.split("\n")
-            bullet_points = [line.strip() for line in lines if line.strip().startswith("- ")]
-
-            # If manual extraction fails, try a simpler split or fallback
-            if not bullet_points and len(result) > 20:
-                 print(f"  Could not extract bullets starting with '- '. Trying sentence splitting. Raw: {result[:100]}...")
-                 # Fallback: Create simple bullet points from the first few sentences
-                 try:
-                     doc_nlp = nlp(text_to_summarize[:500]) # Use nlp on a smaller portion
-                     sentences = list(doc_nlp.sents)
-                     bullet_points = [f"- {sent.text.strip()}" for sent in sentences[:min(len(sentences), 3)] if sent.text.strip()] # Max 3 fallback points
-                 except Exception as nlp_err:
-                      print(f"  Error during NLP fallback for bullets: {nlp_err}")
-                      bullet_points = ["- Summary generation failed."]
-
-
-            return bullet_points if bullet_points else ["- No summary could be generated."]
-
+            bullet_points_response = self.baml.extract_bullet_points(text=text_to_summarize)
+            bullet_points = bullet_points_response.points  # Extract the points array from BulletPoints object
+            
+            # Ensure bullet points start with "- "
+            bullet_points = [f"- {bp.lstrip('- ')}" if not bp.startswith("- ") else bp for bp in bullet_points]
+            return bullet_points if bullet_points else ["- No bullet points generated."]
         except Exception as e:
-            print(f"Error generating bullet points: {e}")
-            return [f"- Error generating bullet points: {e}"]
+            print(f"Error generating bullet points with BAML: {e}")
+            return ["- Error generating bullet points."]
 
     async def batch_generate_bullet_points(self, subtopics: List[Dict[str, Any]]) -> List[List[str]]:
         """Generate bullet points for multiple subtopics concurrently. (Async helper)"""
@@ -706,8 +647,8 @@ class PDFKnowledgeGraph:
         try:
             response = self.db_manager.conn.execute("MATCH (t:Topic) RETURN t ORDER BY t.name")
             topics = []
-            while response.has_next():
-                topic_data = response.get_next()[0]
+            while response.has_next():# type: ignore[attr-defined]
+                topic_data = response.get_next()[0]# type: ignore[attr-defined]
                 topics.append({"id": topic_data["id"], "name": topic_data["name"]})
             return topics
         except Exception as e:
@@ -744,14 +685,14 @@ class PDFKnowledgeGraph:
             print(f"Error retrieving topic {topic_id}: {e}")
             return None
 
-    def get_subtopic_details(self, subtopic_id: str) -> Optional[Dict[str, any]]:
+    def get_subtopic_details(self, subtopic_id: str) -> Optional[Dict[str, Any]]:
         try:
             response = self.db_manager.conn.execute(
                 "MATCH (s:Subtopic {id: $id}) RETURN s",
                 {"id": subtopic_id}
             )
-            if response.has_next():
-                s_data = response.get_next()[0]
+            if response.has_next():  # type: ignore[attr-defined]
+                s_data = response.get_next()[0]  # type: ignore[attr-defined]
                 subtopic = Subtopic(
                     id=s_data["id"],
                     name=s_data["name"],
@@ -766,8 +707,8 @@ class PDFKnowledgeGraph:
                 "MATCH (s:Subtopic {id: $id})-[:SUBTOPIC_OF]->(t:Topic) RETURN t",
                 {"id": subtopic_id}
             )
-            if topic_response.has_next():
-                t_data = topic_response.get_next()[0]
+            if topic_response.has_next():  # type: ignore[attr-defined]
+                t_data = topic_response.get_next()[0]  # type: ignore[attr-defined]
                 topic = {
                     "id": t_data["id"],
                     "name": t_data["name"]
@@ -775,20 +716,35 @@ class PDFKnowledgeGraph:
             else:
                 topic = None
             
+            # Handle case where topic is None
+            image_metadata = []
+            if topic:
+                image_metadata = [
+                    {
+                        "image_path": subtopic.image_metadata[i]["image_path"],
+                        "image_name": subtopic.image_metadata[i]["image_name"],
+                        "page_number": subtopic.image_metadata[i]["page_number"],
+                        "url": f"/images/{topic['name']}/{subtopic.image_metadata[i]['image_name']}"
+                    } for i in range(len(subtopic.image_metadata))
+                ]
+            else:
+                print(f"Warning: No topic found for subtopic {subtopic_id}. Omitting topic name in image URLs.")
+                image_metadata = [
+                    {
+                        "image_path": subtopic.image_metadata[i]["image_path"],
+                        "image_name": subtopic.image_metadata[i]["image_name"],
+                        "page_number": subtopic.image_metadata[i]["page_number"],
+                        "url": f"/images/unknown_topic/{subtopic.image_metadata[i]['image_name']}"
+                    } for i in range(len(subtopic.image_metadata))
+                ]
+
             return {
                 "subtopic": {
                     "id": subtopic.id,
                     "name": subtopic.name,
                     "full_text": subtopic.full_text,
                     "bullet_points": subtopic.bullet_points,
-                    "image_metadata": [
-                        {
-                            "image_path": subtopic.image_metadata[i]["image_path"],
-                            "image_name": subtopic.image_metadata[i]["image_name"],
-                            "page_number": subtopic.image_metadata[i]["page_number"],
-                            "url": f"/images/{topic['name']}/{subtopic.image_metadata[i]['image_name']}"
-                        } for i in range(len(subtopic.image_metadata))
-                    ]
+                    "image_metadata": image_metadata
                 },
                 "topic": topic
             }

@@ -18,21 +18,21 @@ app.add_middleware(
 )
 
 @app.post("/create_graph")
-async def create_graph(file: UploadFile = File(...)):
+async def create_graph(file: UploadFile = File(...), limit: int = 10):
     uploads_dir = "uploads"
     if not os.path.exists(uploads_dir):
         os.makedirs(uploads_dir)
-    pdf_path = os.path.join(uploads_dir, file.filename)
+    pdf_path = os.path.join(uploads_dir, file.filename)# type: ignore[attr-defined]
     with open(pdf_path, "wb") as f:
         f.write(await file.read())
     
-    pdf_name = os.path.basename(file.filename).split(".")[0]
+    pdf_name = os.path.basename(file.filename).split(".")[0]# type: ignore[attr-defined]
     output_dir = f"./extracted_images/{pdf_name}"
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     
     kg = PDFKnowledgeGraph(pdf_path=pdf_path, output_dir=output_dir)
-    await kg.build_knowledge_graph(max_subtopics=5)
+    await kg.build_knowledge_graph(max_subtopics=limit)#the subtopic nmber is limited for now TESTING
     
     # Store metadata for each topic created (assuming build_knowledge_graph populates topics)
     topics = kg.get_all_topics()

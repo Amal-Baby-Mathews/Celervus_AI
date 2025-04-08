@@ -13,9 +13,10 @@ const apiClient = axios.create({
 });
 
 // --- Graph Creation ---
-export const createGraphFromPDF = (file) => {
+export const createGraphFromPDF = (file, limit = 10) => {
   const formData = new FormData();
   formData.append('file', file); // 'file' must match the FastAPI parameter name
+  formData.append('limit', limit); // Add the limit parameter
 
   return apiClient.post('/create_graph', formData, {
     headers: {

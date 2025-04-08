@@ -9,6 +9,7 @@ const FileUpload = () => {
   const [status, setStatus] = useState('idle'); // idle, uploading, success, error
   const [message, setMessage] = useState('');
   const [dragOver, setDragOver] = useState(false);
+  const [subtopicLimit, setSubtopicLimit] = useState(10); // Default limit
   const navigate = useNavigate(); // Hook for navigation
 
   const handleFileChange = (event) => {
@@ -35,22 +36,21 @@ const FileUpload = () => {
     setMessage('Uploading and processing PDF...');
 
     try {
-      const response = await createGraphFromPDF(selectedFile);
+      const response = await createGraphFromPDF(selectedFile, subtopicLimit); // Pass subtopic limit
       setStatus('success');
       setMessage(response.data.message || 'Graph created successfully!');
-      setSelectedFile(null); // Clear selection on success
+      setSelectedFile(null);
 
-      // Redirect to /topics with the first topic ID (if available)
       const topics = response.data.topics || [];
       if (topics.length > 0) {
         const firstTopicId = topics[0].id;
         setTimeout(() => {
           navigate('/topics', { state: { selectedTopicId: firstTopicId } });
-        }, 1000); // Delay for user to see success message
+        }, 1000);
       } else {
         setTimeout(() => {
           navigate('/topics');
-        }, 1000); // Fallback to /topics without pre-selection
+        }, 1000);
       }
     } catch (error) {
       setStatus('error');
@@ -89,7 +89,7 @@ const FileUpload = () => {
 
   return (
     <motion.div
-      className="card space-y-6" // Use card style from index.css
+      className="card space-y-6"
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.3 }}
@@ -123,6 +123,26 @@ const FileUpload = () => {
         )}
       </div>
 
+      {/* Subtopic Limit Slider */}
+      <div className="space-y-2">
+        <label htmlFor="subtopic-limit" className="text-text-main font-medium">
+          Maximum Subtopics: {subtopicLimit}
+        </label>
+        <input
+          type="range"
+          id="subtopic-limit"
+          min="1"
+          max="50" // Adjust max as needed
+          value={subtopicLimit}
+          onChange={(e) => setSubtopicLimit(parseInt(e.target.value))}
+          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
+          disabled={status === 'uploading'}
+        />
+        <p className="text-text-muted text-sm">
+          Adjust the number of subtopics to extract (1-50).
+        </p>
+      </div>
+
       <AnimatePresence>
         {message && (
           <motion.div
@@ -133,7 +153,7 @@ const FileUpload = () => {
             className={`p-3 rounded-md text-sm flex items-center ${
               status === 'success' ? 'bg-green-100 text-green-800' :
               status === 'error' ? 'bg-red-100 text-red-800' :
-              'bg-blue-100 text-blue-800' // uploading or idle with message
+              'bg-blue-100 text-blue-800'
             }`}
           >
             {status === 'success' && <CheckCircle size={20} className="mr-2 flex-shrink-0" />}
@@ -147,7 +167,7 @@ const FileUpload = () => {
       <motion.button
         onClick={handleUpload}
         disabled={!selectedFile || status === 'uploading'}
-        className="btn-primary w-full flex items-center justify-center" // Use btn-primary from index.css
+        className="btn-primary w-full flex items-center justify-center"
         whileHover={{ scale: status !== 'uploading' ? 1.03 : 1 }}
         whileTap={{ scale: status !== 'uploading' ? 0.98 : 1 }}
       >
@@ -164,5 +184,4 @@ const FileUpload = () => {
     </motion.div>
   );
 };
-
 export default FileUpload;
