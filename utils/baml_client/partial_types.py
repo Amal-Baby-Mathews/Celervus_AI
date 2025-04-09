@@ -55,6 +55,22 @@ class ContextSource(BaseModel):
     content: Optional[str] = None
     relevanceScore: Optional[float] = None
 
+class FinalResponse(BaseModel):
+    answer: StreamState[Optional[str]]
+    queryUsed: Optional[str] = None
+    rawResults: Optional[str] = None
+
+class GraphQuery(BaseModel):
+    query: Optional[str] = None
+
+class GraphResult(BaseModel):
+    result: Optional[str] = None
+
+class GraphSchema(BaseModel):
+    nodes: List[str]
+    relationships: List[str]
+    properties: List[str]
+
 class Resume(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None

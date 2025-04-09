@@ -37,6 +37,29 @@ class HttpRequest:
       self.__ctx_manager = ctx_manager
 
     
+    def AnalyzeResults(
+        self,
+        question: str,query: str,results: types.GraphResult,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.HTTPRequest:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      return self.__runtime.build_request_sync(
+        "AnalyzeResults",
+        {
+          "question": question,"query": query,"results": results,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        False,
+      )
+    
     def CheckSubtopicRelevance(
         self,
         text: str,
@@ -122,6 +145,29 @@ class HttpRequest:
         "GenerateDocumentTitle",
         {
           "text_chunks": text_chunks,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        False,
+      )
+    
+    def GenerateGraphQuery(
+        self,
+        schema: types.GraphSchema,question: str,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.HTTPRequest:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      return self.__runtime.build_request_sync(
+        "GenerateGraphQuery",
+        {
+          "schema": schema,"question": question,
         },
         self.__ctx_manager.get(),
         tb,
@@ -209,6 +255,29 @@ class HttpStreamRequest:
       self.__ctx_manager = ctx_manager
 
     
+    def AnalyzeResults(
+        self,
+        question: str,query: str,results: types.GraphResult,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.HTTPRequest:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      return self.__runtime.build_request_sync(
+        "AnalyzeResults",
+        {
+          "question": question,"query": query,"results": results,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        True,
+      )
+    
     def CheckSubtopicRelevance(
         self,
         text: str,
@@ -294,6 +363,29 @@ class HttpStreamRequest:
         "GenerateDocumentTitle",
         {
           "text_chunks": text_chunks,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        True,
+      )
+    
+    def GenerateGraphQuery(
+        self,
+        schema: types.GraphSchema,question: str,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.HTTPRequest:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      return self.__runtime.build_request_sync(
+        "GenerateGraphQuery",
+        {
+          "schema": schema,"question": question,
         },
         self.__ctx_manager.get(),
         tb,

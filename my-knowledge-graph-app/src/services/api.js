@@ -40,5 +40,40 @@ export const getSubtopicDetails = (subtopicId) => {
 };
 
 // You might want error handling wrappers around these calls later
+export const streamQuery = async (query, onChunk, onComplete, onError) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/query?query=${encodeURIComponent(query)}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'text/plain', // Important to tell the server we expect plain text
+      },
+    });
 
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    if (!response.body) {
+        throw new Error('Response body is null');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      const chunk = decoder.decode(value, { stream: true });
+      onChunk(chunk);
+    }
+
+    onComplete();
+
+  } catch (error) {
+    console.error('Streaming error:', error);
+    onError(error instanceof Error ? error : new Error(String(error)));
+  }
+};
 export default apiClient; // Optional: export the configured client if needed elsewhere

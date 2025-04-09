@@ -1,6 +1,7 @@
 import React from 'react';
 import { Outlet, Link, NavLink } from 'react-router-dom';
 import { Home, Upload, Network } from 'lucide-react';
+import ChatWidget from './ChatWidget/ChatWidget'; // Import the new widget
 
 const Layout = () => {
   const navLinkClass = ({ isActive }) =>
@@ -44,6 +45,8 @@ const Layout = () => {
       <footer className="bg-gray-800 dark:bg-gray-900 text-gray-300 dark:text-gray-400 text-center p-4 sm:p-6 mt-8">
         © {new Date().getFullYear()} Celervus. All rights reserved.
       </footer>
+            {/* Celerbud Chat Widget - Rendered persistently */}
+            <ChatWidget />
     </div>
   );
 };

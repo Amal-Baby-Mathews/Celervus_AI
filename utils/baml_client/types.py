@@ -60,6 +60,22 @@ class ContextSource(BaseModel):
     content: str
     relevanceScore: float
 
+class FinalResponse(BaseModel):
+    answer: str
+    queryUsed: str
+    rawResults: str
+
+class GraphQuery(BaseModel):
+    query: str
+
+class GraphResult(BaseModel):
+    result: str
+
+class GraphSchema(BaseModel):
+    nodes: List[str]
+    relationships: List[str]
+    properties: List[str]
+
 class Resume(BaseModel):
     name: str
     email: str

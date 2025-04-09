@@ -7,7 +7,7 @@ from langchain_groq import ChatGroq
 from dotenv import load_dotenv
 import os
 from dataclasses import dataclass, field
-
+from baml_client.types import GraphSchema
 @dataclass
 class Topic:
     """Represents a main topic with content and metadata."""
@@ -292,7 +292,135 @@ class KuzuDBManager:
         except Exception as e:
             print(f"Error creating nested subtopic {subtopic.id} under {parent_type} {parent_id}: {e}")
             return False
+    def get_schema(self) -> str:
+        """
+        Retrieve the full schema from the KuzuDB database and return it as a structured string.
 
+        Returns:
+            str: A structured string representation of the schema.
+        """
+        try:
+            # Initialize structured schema components
+            nodes = []
+            relationships = []
+            properties = []
+
+            # Get all tables using SHOW_TABLES
+            print("Executing SHOW_TABLES to retrieve all tables...")
+            response = self.conn.execute("CALL SHOW_TABLES() RETURN *;")
+            while response.has_next():
+                table_info = response.get_next()
+                table_name = table_info[1]  # STRING
+                table_type = table_info[2]  # STRING (NODE or REL)
+                print(f"Found table: name={table_name}, type={table_type}")
+
+                # Get properties using TABLE_INFO
+                print(f"Retrieving properties for table: {table_name}")
+                prop_response = self.conn.execute(f"CALL TABLE_INFO('{table_name}') RETURN *;")
+                table_properties = []
+                while prop_response.has_next():
+                    prop_info = prop_response.get_next()
+                    prop_detail = f"{prop_info[1]} ({prop_info[2]}{', PK' if prop_info[4] else ''})"
+                    table_properties.append(prop_detail)
+                    properties.append(prop_detail)  # Add to global properties list
+
+                if table_type == "NODE":
+                    nodes.append(f"{table_name} {{ {', '.join(table_properties)} }}")
+                    print(f"Added to nodes: {nodes[-1]}")
+                elif table_type == "REL":
+                    # Get connection details for relationships using SHOW_CONNECTION
+                    conn_response = self.conn.execute(f"CALL SHOW_CONNECTION('{table_name}') RETURN *;")
+                    if conn_response.has_next():
+                        conn_info = conn_response.get_next()
+                        rel_detail = f"{table_name} ({conn_info[0]} -> {conn_info[1]}) {{ {', '.join(table_properties)} }}"
+                        relationships.append(rel_detail)
+                        print(f"Added to relationships: {rel_detail}")
+                    else:
+                        relationships.append(f"{table_name} {{ {', '.join(table_properties)} }}")
+                        print(f"Added to relationships (no connections found): {relationships[-1]}")
+
+            # Construct structured string output
+            schema_str = "Graph Schema:\n"
+            schema_str += "Nodes:\n" + "\n".join(f"  - {node}" for node in nodes) + "\n" if nodes else "Nodes: None\n"
+            schema_str += "Relationships:\n" + "\n".join(f"  - {rel}" for rel in relationships) + "\n" if relationships else "Relationships: None\n"
+            schema_str += "Properties:\n" + "\n".join(f"  - {prop}" for prop in sorted(properties)) if properties else "Properties: None"
+
+            print("Finalizing schema retrieval...")
+            return schema_str
+
+        except Exception as e:
+            print(f"Error retrieving schema: {e}")
+            return "Graph Schema:\nNodes: None\nRelationships: None\nProperties: None"
+
+    def get_table_schema(self, identifier: str, by_id: bool = False) -> str:
+        """
+        Retrieve the schema for a specific table by name or ID and return it as a structured string.
+
+        Args:
+            identifier (str): The table name or ID to query.
+            by_id (bool): If True, treat identifier as a table ID; otherwise, treat as a table name.
+
+        Returns:
+            str: A structured string representation of the table schema.
+        """
+        try:
+            # Find the table using SHOW_TABLES with a filter
+            if by_id:
+                response = self.conn.execute(
+                    "CALL SHOW_TABLES() RETURN * WHERE id = $id;",
+                    {"id": int(identifier)}  # UINT64
+                )
+            else:
+                response = self.conn.execute(
+                    "CALL SHOW_TABLES() RETURN * WHERE name = $name;",
+                    {"name": identifier}
+                )
+
+            if not response.has_next():
+                print(f"Table with {'ID' if by_id else 'name'} '{identifier}' not found.")
+                return f"Graph Schema for {'ID' if by_id else 'name'} '{identifier}':\nNodes: None\nRelationships: None\nProperties: None"
+
+            table_info = response.get_next()
+            table_name = table_info[1]  # STRING
+            table_type = table_info[2]  # STRING (NODE or REL)
+            print(f"Found table: name={table_name}, type={table_type}")
+
+            # Get properties using TABLE_INFO
+            prop_response = self.conn.execute(f"CALL TABLE_INFO('{table_name}') RETURN *;")
+            properties = []
+            while prop_response.has_next():
+                prop_info = prop_response.get_next()
+                prop_detail = f"{prop_info[1]} ({prop_info[2]}{', PK' if prop_info[4] else ''})"
+                properties.append(prop_detail)
+
+            # Initialize schema components
+            nodes = []
+            relationships = []
+            if table_type == "NODE":
+                nodes.append(f"{table_name} {{ {', '.join(properties)} }}")
+                print(f"Added to nodes: {nodes[-1]}")
+            elif table_type == "REL":
+                conn_response = self.conn.execute(f"CALL SHOW_CONNECTION('{table_name}') RETURN *;")
+                if conn_response.has_next():
+                    conn_info = conn_response.get_next()
+                    rel_detail = f"{table_name} ({conn_info[0]} -> {conn_info[1]}) {{ {', '.join(properties)} }}"
+                    relationships.append(rel_detail)
+                    print(f"Added to relationships: {rel_detail}")
+                else:
+                    relationships.append(f"{table_name} {{ {', '.join(properties)} }}")
+                    print(f"Added to relationships (no connections found): {relationships[-1]}")
+
+            # Construct structured string output
+            schema_str = f"Graph Schema for {'ID' if by_id else 'name'} '{identifier}':\n"
+            schema_str += "Nodes:\n" + "\n".join(f"  - {node}" for node in nodes) + "\n" if nodes else "Nodes: None\n"
+            schema_str += "Relationships:\n" + "\n".join(f"  - {rel}" for rel in relationships) + "\n" if relationships else "Relationships: None\n"
+            schema_str += "Properties:\n" + "\n".join(f"  - {prop}" for prop in sorted(properties)) if properties else "Properties: None"
+
+            return schema_str
+
+        except Exception as e:
+            print(f"Error retrieving schema for table {'ID' if by_id else 'name'} '{identifier}': {e}")
+            return f"Graph Schema for {'ID' if by_id else 'name'} '{identifier}':\nNodes: None\nRelationships: None\nProperties: None"
 # Example Usage
 if __name__ == "__main__":
     db_manager = KuzuDBManager(db_path="./test_db", in_memory=False)
