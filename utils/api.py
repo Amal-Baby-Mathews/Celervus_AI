@@ -8,6 +8,9 @@ from typing import List, Dict, Optional, Any
 from fastapi.responses import StreamingResponse
 from celerbud import BAMLFunctions  # Assuming BAMLFunctions is your Celerbud class
 from kuzu_init import KuzuDBManager  # Assuming KuzuDBManager is your database manager class
+from json_processing import JSONKnowledgeGraph  # Assuming JSONKnowledgeGraph is your JSON processing class
+from fastapi import Body
+
 app = FastAPI()
 
 # Mount static files directory for images
@@ -127,7 +130,76 @@ def query_endpoint(query: str):
 
     # Test with curl (use -N for no buffering to see streaming):
     # curl -N -X GET "http://localhost:8008/query?query=What%20subtopics%20are%20under%20the%20topic%20'Barcode%20Scanning%20Procedure:%20Align%20and%20Capture%20Barcode%20Data'?"
+# New endpoint to ingest a JSON file
+@app.post("/ingest_json_file")
+async def ingest_json_file(file: UploadFile = File(...), node_table: str = "Node", rel_table: Optional[str] = None):
+    """Ingest a JSON file into the KuzuDB knowledge graph.
 
+    Args:
+        file (UploadFile): The JSON file to ingest.
+        node_table (str): Name of the node table (default: 'Node').
+        rel_table (Optional[str]): Name of the relationship table (if applicable).
+
+    Returns:
+        dict: Success message or error.
+    """
+    uploads_dir = "uploads"
+    if not os.path.exists(uploads_dir):
+        os.makedirs(uploads_dir)
+    json_path = os.path.join(uploads_dir, file.filename) # type: ignore
+    with open(json_path, "wb") as f:
+        f.write(await file.read())
+
+    try:
+        jkg = JSONKnowledgeGraph(db_manager=shared_db_manager)
+        jkg.ingest_json_file(json_path, node_table=node_table, rel_table=rel_table)
+        return {"message": f"Successfully ingested JSON file '{file.filename}' into table(s)."}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error ingesting JSON file: {str(e)}")
+
+    # Test with curl:
+    # curl -X POST "http://localhost:8008/ingest_json_file?node_table=Person" -F "file=@/home/seq_amal/work_temp/Celervus_temp/Celervus_AI/people.json"
+
+# New endpoint to ingest a JSON string
+@app.post("/ingest_json_string")
+async def ingest_json_string(json_str: str = Body(...), node_table: str = "Node", rel_table: Optional[str] = None):
+    """Ingest a JSON string into the KuzuDB knowledge graph.
+
+    Args:
+        json_str (str): The JSON string to ingest.
+        node_table (str): Name of the node table (default: 'Node').
+        rel_table (Optional[str]): Name of the relationship table (if applicable).
+
+    Returns:
+        dict: Success message or error.
+    """
+    try:
+        jkg = JSONKnowledgeGraph(db_manager=shared_db_manager)
+        jkg.ingest_json_string(json_str, node_table=node_table, rel_table=rel_table)
+        return {"message": "Successfully ingested JSON string into table(s)."}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error ingesting JSON string: {str(e)}")
+
+    # Test with curl:
+    # curl -X POST "http://localhost:8008/ingest_json_string?node_table=Person" -H "Content-Type: application/json" -d '"[{\"id\": \"p1\", \"name\": \"Gregory\"}]"'
+
+# New endpoint to list JSON-ingested node tables
+@app.get("/json_nodes")
+def get_json_nodes(json_only: bool = True):
+    """Retrieve all JSON-ingested node tables in the knowledge graph.
+
+    Args:
+        json_only (bool): If True, only return JSON-ingested tables (default: True).
+
+    Returns:
+        list: List of node table names.
+    """
+    jkg = JSONKnowledgeGraph(db_manager=shared_db_manager)
+    nodes = jkg.list_json_nodes(json_only=json_only)
+    return nodes
+
+    # Test with curl:
+    # curl -X GET "http://localhost:8008/json_nodes?json_only=true"
 # Example Usage
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8008)

@@ -182,7 +182,8 @@ class BAMLFunctions:
                 print(f"Error querying graph: {e}")
                 return f"Error: Unable to process query '{query}' due to {str(e)}"
 if __name__ == "__main__":
-    celerbud = BAMLFunctions()  # Assuming proper initialization
+    shared_db_manager = KuzuDBManager(db_path="./kuzu_db", in_memory=False)
+    celerbud = BAMLFunctions(kuzu_client=shared_db_manager)  # Assuming proper initialization
     query = "What subtopics are under the topic 'Barcode Scanning Procedure: Align and Capture Barcode Data'?"
     result = celerbud.query_graph(query)
     print(f"Final result: {result}")
