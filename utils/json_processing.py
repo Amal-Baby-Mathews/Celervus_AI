@@ -5,13 +5,15 @@ from kuzu_init import KuzuDBManager  # Ensure type hinting
 import json
 import os
 import tempfile
-
+from baml_client import b  # BAML client
+from baml_client.types import GraphSchema, GraphQuery, GraphResult, FinalResponse
 class JSONKnowledgeGraph:
     """Class to ingest JSON data into a KuzuDB knowledge graph and query it."""
 
     def __init__(self, db_manager: KuzuDBManager):
         """Initialize with a shared KuzuDBManager instance."""
         self.db_manager = db_manager
+        self.baml_client = b  # Initialize BAML client
         # Ensure JSON extension is loaded
         try:
             # self.db_manager.conn.execute("INSTALL json;")
@@ -121,34 +123,152 @@ class JSONKnowledgeGraph:
         except Exception as e:
             print(f"Error ingesting JSON into relationship table '{table_name}': {e}")
 
-    def query_graph_nlp(self, nlp_query: str) -> str:
-        """Placeholder to query the graph using NLP, converting to Cypher.
+    def get_table_schema(self, table_id: int) -> str:
+        """Retrieve the schema for a specific table by its ID as a structured string.
+
+        Args:
+            table_id (int): The ID of the table (from SHOW_TABLES).
+
+        Returns:
+            str: Structured string describing the schema (nodes, relationships, properties).
+        """
+        try:
+            # Find the table name by ID
+            response = self.db_manager.conn.execute("CALL SHOW_TABLES() RETURN *;")
+            table_name = None
+            table_type = None
+            while response.has_next():
+                table_info = response.get_next()
+                if table_info[0] == table_id:
+                    table_name = table_info[1]
+                    table_type = table_info[2]
+                    break
+            
+            if not table_name:
+                raise ValueError(f"No table found with ID {table_id}.")
+            
+            # Get table properties
+            prop_response = self.db_manager.conn.execute(f"CALL TABLE_INFO('{table_name}') RETURN *;")
+            properties = []
+            while prop_response.has_next():
+                prop_info = prop_response.get_next()
+                prop_detail = f"{prop_info[1]} ({prop_info[2]}{', PK' if prop_info[4] else ''})"
+                properties.append(prop_detail)
+
+            # Construct schema string
+            schema_str = "Graph Schema:\n"
+            if table_type == "NODE":
+                schema_str += f"Nodes:\n  - {table_name} {{ {', '.join(properties)} }}\n"
+                schema_str += "Relationships: None\n"
+            elif table_type == "REL":
+                conn_response = self.db_manager.conn.execute(f"CALL SHOW_CONNECTION('{table_name}') RETURN *;")
+                if conn_response.has_next():
+                    conn_info = conn_response.get_next()
+                    schema_str += "Nodes: None\n"
+                    schema_str += f"Relationships:\n  - {table_name} ({conn_info[0]} -> {conn_info[1]}) {{ {', '.join(properties)} }}\n"
+                else:
+                    schema_str += "Nodes: None\n"
+                    schema_str += f"Relationships:\n  - {table_name} {{ {', '.join(properties)} }}\n"
+            schema_str += f"Properties:\n" + "\n".join(f"  - {p}" for p in properties) if properties else "Properties: None"
+
+            return schema_str
+
+        except Exception as e:
+            print(f"Error retrieving schema for table ID {table_id}: {e}")
+            return "Graph Schema:\nNodes: None\nRelationships: None\nProperties: None"
+
+    def query_graph_nlp(self, nlp_query: str, table_id: int) -> str:
+        """Query the graph using NLP, converting to Cypher with BAML, for a specific table.
 
         Args:
             nlp_query (str): Natural language query.
+            table_id (int): ID of the JSON-ingested table to query.
 
         Returns:
-            str: Dummy response (to be developed later).
+            str: Natural language response based on query results.
         """
-        # Placeholder implementation
-        print(f"Received NLP query: {nlp_query}")
-        return f"Dummy response for query: '{nlp_query}'. Cypher conversion to be implemented."
-    def list_json_nodes(self, json_only: bool = True) -> List[str]:
-        """List all node tables in the database, optionally filtering to those created by JSON ingestion.
+        try:
+            print(f"Received NLP query: '{nlp_query}' for table ID {table_id}")
+
+            # Step 1: Retrieve schema for the specific table
+            print(f"Retrieving schema for table ID {table_id}...")
+            schema_str = self.get_table_schema(table_id)
+            print(f"Schema retrieved:\n{schema_str}")
+
+            # Parse schema into GraphSchema
+            nodes = []
+            relationships = []
+            properties = []
+            node_section = re.search(r"Nodes:\n(.*?)(?:\nRelationships:|$)", schema_str, re.DOTALL)
+            if node_section and "None" not in node_section.group(1):
+                for line in node_section.group(1).splitlines():
+                    if line.strip().startswith("- "):
+                        nodes.append(line.strip()[2:])
+            rel_section = re.search(r"Relationships:\n(.*?)(?:\nProperties:|$)", schema_str, re.DOTALL)
+            if rel_section and "None" not in rel_section.group(1):
+                for line in rel_section.group(1).splitlines():
+                    if line.strip().startswith("- "):
+                        relationships.append(line.strip()[2:])
+            prop_section = re.search(r"Properties:\n(.*)", schema_str, re.DOTALL)
+            if prop_section and "None" not in prop_section.group():
+                for line in prop_section.group(1).splitlines():
+                    if line.strip().startswith("- "):
+                        properties.append(line.strip()[2:])
+
+            schema = GraphSchema(nodes=nodes, relationships=relationships, properties=properties)
+            print(f"Parsed schema: Nodes - {schema.nodes}, Relationships - {schema.relationships}")
+
+            if not schema.nodes and not schema.relationships:
+                return f"Error: No schema found for table ID {table_id}."
+
+            # Step 2: Generate Cypher query with BAML
+            print("Generating Cypher query with BAML...")
+            graph_query: GraphQuery = self.baml_client.GenerateJsonQuery(question=nlp_query, schema=schema)
+            cypher_query = graph_query.query
+            print(f"Generated Cypher query: {cypher_query}")
+            if not cypher_query:
+                return "Error: Failed to generate a valid Cypher query."
+
+            # Step 3: Execute the query
+            print("Executing Cypher query...")
+            response = self.db_manager.conn.execute(cypher_query)
+            result_data = []
+            while response.has_next():
+                result_data.append(response.get_next())
+            result_str = "\n".join([str(row) for row in result_data]) if result_data else "No results found."
+            print(f"Query results: {result_str}")
+            graph_result = GraphResult(result=result_str)
+
+            # Step 4: Analyze results with BAML
+            print("Analyzing results with BAML...")
+            final_response: FinalResponse = self.baml_client.AnalyzeResults(
+                question=nlp_query,
+                query=cypher_query,
+                results=graph_result
+            )
+            print(f"Final response: {final_response.answer}")
+            return final_response.answer
+
+        except Exception as e:
+            print(f"Error processing NLP query '{nlp_query}' for table ID {table_id}: {e}")
+            return f"Error: Unable to process query due to {str(e)}"
+    def list_json_nodes(self, json_only: bool = True) -> List[Dict[str, Any]]:
+        """List all node tables in the database with their IDs, optionally filtering to those created by JSON ingestion.
 
         Args:
             json_only (bool): If True, only return tables tagged as JSON-ingested (default: True).
 
         Returns:
-            List[str]: List of node table names.
+            List[Dict[str, Any]]: List of dictionaries with 'id' and 'name' for each node table.
         """
         try:
             # Use SHOW_TABLES to get all tables
             response = self.db_manager.conn.execute("CALL SHOW_TABLES() RETURN *;")
             tables = []
 
-            while response.has_next():#type: ignore
-                table_info = response.get_next()#type: ignore
+            while response.has_next():
+                table_info = response.get_next()
+                table_id = table_info[0]  # Column 0 is the table ID
                 table_name = table_info[1]  # Column 1 is the table name
                 table_type = table_info[2]  # Column 2 is the table type (NODE or REL)
 
@@ -157,11 +277,70 @@ class JSONKnowledgeGraph:
                     # Check if table is JSON-ingested (tagged with "JSON_" prefix)
                     is_json_table = table_name.startswith("JSON_")
                     if not json_only or (json_only and is_json_table):
-                        tables.append(table_name)
+                        tables.append({"id": table_id, "name": table_name})
 
             return tables
         except Exception as e:
             print(f"Error listing node tables: {e}")
+            return []
+    def get_json_table_nodes(self, table_id: int, id: Optional[str] = None, name: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Retrieve nodes from a specific JSON-ingested table by table ID.
+
+        Args:
+            table_id (int): The ID of the JSON-ingested table (e.g., 3 for 'JSON_Person').
+            id (Optional[str]): The ID to filter nodes by (exact match).
+            name (Optional[str]): The name to filter nodes by (exact match).
+
+        Returns:
+            List[Dict[str, Any]]: List of nodes (as dictionaries) matching the criteria.
+
+        Raises:
+            ValueError: If the table ID does not correspond to a JSON-ingested node table.
+        """
+        try:
+            # Get all tables and find the one matching the table_id
+            response = self.db_manager.conn.execute("CALL SHOW_TABLES() RETURN *;")
+            table_name = None
+            while response.has_next():
+                table_info = response.get_next()
+                if table_info[0] == table_id and table_info[2] == "NODE":
+                    table_name = table_info[1]  # Column 1 is the table name
+                    if not table_name.startswith("JSON_"):
+                        raise ValueError(f"Table with ID {table_id} ('{table_name}') is not a JSON-ingested table.")
+                    break
+            
+            if table_name is None:
+                raise ValueError(f"No node table found with ID {table_id}.")
+
+            # Build the Cypher query based on filters
+            query = f"MATCH (n:{table_name})"
+            conditions = []
+            params = {}
+            if id:
+                conditions.append("n.id = $id")
+                params["id"] = id
+            if name:
+                conditions.append("n.name = $name")
+                params["name"] = name
+            
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+            query += " RETURN n;"
+
+            # Execute the query
+            response = self.db_manager.conn.execute(query, params)
+            nodes = []
+            while response.has_next():
+                node_data = response.get_next()[0]  # First column is the node
+                nodes.append({key: value for key, value in node_data.items()})
+
+            return nodes
+
+        except ValueError as ve:
+            print(f"Error: {ve}")
+            raise
+        except Exception as e:
+            print(f"Error retrieving nodes from table with ID {table_id}: {e}")
             return []
 if __name__ == "__main__":
     # # Example usage of JSONKnowledgeGraph

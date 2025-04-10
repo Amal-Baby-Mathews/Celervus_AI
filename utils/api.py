@@ -183,23 +183,68 @@ async def ingest_json_string(json_str: str = Body(...), node_table: str = "Node"
     # Test with curl:
     # curl -X POST "http://localhost:8008/ingest_json_string?node_table=Person" -H "Content-Type: application/json" -d '"[{\"id\": \"p1\", \"name\": \"Gregory\"}]"'
 
-# New endpoint to list JSON-ingested node tables
 @app.get("/json_nodes")
 def get_json_nodes(json_only: bool = True):
-    """Retrieve all JSON-ingested node tables in the knowledge graph.
+    """Retrieve all JSON-ingested node tables with their IDs in the knowledge graph.
 
     Args:
         json_only (bool): If True, only return JSON-ingested tables (default: True).
 
     Returns:
-        list: List of node table names.
+        List[Dict[str, Any]]: List of node tables with 'id' and 'name'.
     """
     jkg = JSONKnowledgeGraph(db_manager=shared_db_manager)
     nodes = jkg.list_json_nodes(json_only=json_only)
     return nodes
+@app.get("/json_nodes_by_id/{table_id}")
+async def get_json_table_nodes_by_id(table_id: int, id: Optional[str] = None, name: Optional[str] = None):
+    """Retrieve nodes from a specific JSON-ingested table by table ID.
+
+    Args:
+        table_id (int): The ID of the JSON-ingested table (e.g., 3 for 'JSON_Person').
+        id (Optional[str]): Filter by node ID (exact match).
+        name (Optional[str]): Filter by node name (exact match).
+
+    Returns:
+        List[Dict[str, Any]]: List of nodes matching the criteria.
+
+    Raises:
+        HTTPException: If the table ID does not exist or an error occurs.
+    """
+    try:
+        jkg = JSONKnowledgeGraph(db_manager=shared_db_manager)
+        nodes = jkg.get_json_table_nodes(table_id, id=id, name=name)
+        return nodes
+    except ValueError as ve:
+        raise HTTPException(status_code=404, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving nodes: {str(e)}")
 
     # Test with curl:
-    # curl -X GET "http://localhost:8008/json_nodes?json_only=true"
+    # curl -X GET "http://localhost:8008/json_nodes_by_id/3"
+    # curl -X GET "http://localhost:8008/json_nodes_by_id/3?id=p1"
+    # curl -X GET "http://localhost:8008/json_nodes_by_id/3?name=Gregory"
+# In main.py
+@app.get("/query_json/{table_id}")
+async def query_json_table(table_id: int, query: str):
+    """Query a specific JSON-ingested table using NLP.
+
+    Args:
+        table_id (int): The ID of the JSON-ingested table to query.
+        query (str): The natural language query.
+
+    Returns:
+        dict: Response with the natural language answer.
+    """
+    try:
+        jkg = JSONKnowledgeGraph(db_manager=shared_db_manager)
+        answer = jkg.query_graph_nlp(query, table_id)
+        return {"answer": answer}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error querying table ID {table_id}: {str(e)}")
+
+    # Test with curl:
+    # curl -X GET "http://localhost:8008/query_json/3?query=What%20is%20the%20name%20of%20the%20person%20with%20ID%20'p1'?"
 # Example Usage
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8008)
