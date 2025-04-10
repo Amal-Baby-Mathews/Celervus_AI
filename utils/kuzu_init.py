@@ -39,7 +39,7 @@ class KuzuDBManager:
         self.db = kuzu.Database(self.db_path)
         self.conn = kuzu.Connection(self.db)
         self.graph = KuzuGraph(self.db, allow_dangerous_requests=True)
-        self.llm = ChatGroq(temperature=0, groq_api_key=os.getenv("GROQ_API"), model_name="llama3-70b-8192")
+        self.llm = ChatGroq(temperature=0, api_key=os.getenv("GROQ_API"), model="llama3-70b-8192")#type: ignore[assignment]
         self.qa_chain = KuzuQAChain.from_llm(llm=self.llm, graph=self.graph, verbose=True, allow_dangerous_requests=True)
         self._initialize_schema()
 

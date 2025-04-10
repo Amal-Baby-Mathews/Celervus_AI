@@ -27,7 +27,7 @@ class PDFKnowledgeGraph:
 
     def __post_init__(self):
         # Instantiate BAMLFunctions
-        self.baml = BAMLFunctions()
+        self.baml = BAMLFunctions(kuzu_client=self.db_manager)
         """Initialize output directory and validate PDF path."""
         print(f"Initializing PDFKnowledgeGraph for PDF: {self.pdf_path}")
 

@@ -12,9 +12,9 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 class BAMLFunctions:
-    def __init__(self):
+    def __init__(self,kuzu_client: KuzuDBManager):
         self.client = b                    
-        self.kuzu_client= KuzuDBManager()
+        self.kuzu_client= kuzu_client
     def streaming_chat(self, messages: List[ChatMessage]) -> ChatResponse:
         """Fetches the best context for the query and executes a streaming chat function."""
         user_message = next((msg for msg in messages if msg.role == "user"), None)

@@ -7,7 +7,7 @@ import uvicorn
 from typing import List, Dict, Optional, Any
 from fastapi.responses import StreamingResponse
 from celerbud import BAMLFunctions  # Assuming BAMLFunctions is your Celerbud class
-
+from kuzu_init import KuzuDBManager  # Assuming KuzuDBManager is your database manager class
 app = FastAPI()
 
 # Mount static files directory for images
@@ -21,7 +21,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
+# Shared KuzuDBManager instance for all operations
+shared_db_manager = KuzuDBManager(db_path="./kuzu_db", in_memory=False)
+print(f"Initialized shared KuzuDBManager with db_path: {shared_db_manager.db_path}")
 @app.post("/create_graph")
 async def create_graph(file: UploadFile = File(...), limit: int = 10):
     """Create a knowledge graph from an uploaded PDF file.
@@ -45,7 +47,7 @@ async def create_graph(file: UploadFile = File(...), limit: int = 10):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     
-    kg = PDFKnowledgeGraph(pdf_path=pdf_path, output_dir=output_dir)
+    kg = PDFKnowledgeGraph(pdf_path=pdf_path, output_dir=output_dir, db_manager=shared_db_manager)
     await kg.build_knowledge_graph(max_subtopics=limit)  # Subtopic number limited for testing
     
     # Store metadata for each topic created
@@ -54,7 +56,7 @@ async def create_graph(file: UploadFile = File(...), limit: int = 10):
     return {"message": "Graph created successfully", "topics": topics}
 
     # Test with curl:
-    # curl -X POST "http://localhost:8008/create_graph?limit=5" -F "file=@/path/to/your/file.pdf"
+    # curl -X POST "http://localhost:8008/create_graph?limit=5" -F "file=@/home/seq_amal/work_temp/Celervus_temp/Celervus_AI/Applied-Machine-Learning-and-AI-for-Engineers.pdf"
 
 @app.get("/topics")
 def get_all_topics():
@@ -63,7 +65,7 @@ def get_all_topics():
     Returns:
         list: List of all topics.
     """
-    kg = PDFKnowledgeGraph(pdf_path="", output_dir="")  # Note: This might need a valid path in practice
+    kg = PDFKnowledgeGraph(pdf_path="", output_dir="", db_manager=shared_db_manager)  # Note: This might need a valid path in practice
     return kg.get_all_topics()
 
     # Test with curl:
@@ -79,7 +81,7 @@ def get_topic_details(topic_id: str):
     Returns:
         dict: Topic details or 404 if not found.
     """
-    kg = PDFKnowledgeGraph(pdf_path="", output_dir="")  # Note: This might need a valid path in practice
+    kg = PDFKnowledgeGraph(pdf_path="", output_dir="", db_manager=shared_db_manager)  # Note: This might need a valid path in practice
     details = kg.get_topic_details(topic_id)
     if not details:
         raise HTTPException(status_code=404, detail=f"Topic {topic_id} not found")
@@ -98,7 +100,7 @@ def get_subtopic_details(subtopic_id: str):
     Returns:
         dict: Subtopic details or error message if not found.
     """
-    kg = PDFKnowledgeGraph(pdf_path="", output_dir="")  # Note: This might need a valid path in practice
+    kg = PDFKnowledgeGraph(pdf_path="", output_dir="", db_manager=shared_db_manager)  # Note: This might need a valid path in practice
     details = kg.get_subtopic_details(subtopic_id)
     if details:
         return details
@@ -117,7 +119,7 @@ def query_endpoint(query: str):
     Returns:
         StreamingResponse: Streams the query processing results in real-time.
     """
-    celerbud = BAMLFunctions()
+    celerbud = BAMLFunctions(kuzu_client=shared_db_manager)
     return StreamingResponse(
         celerbud.query_graph(query),  # Assuming query_graph_stream is defined in BAMLFunctions
         media_type="text/plain"
