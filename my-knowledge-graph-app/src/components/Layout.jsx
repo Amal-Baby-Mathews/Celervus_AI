@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, Link, NavLink } from 'react-router-dom';
-import { Home, Upload, Network } from 'lucide-react';
+import { Home, Upload, Network,Database } from 'lucide-react';
 import ChatWidget from './ChatWidget/ChatWidget'; // Import the new widget
 
 const Layout = () => {
@@ -32,7 +32,12 @@ const Layout = () => {
               <NavLink to="/topics" className={navLinkClass}>
                 <Network size={20} className="mr-1 sm:mr-2" /> View Topics
               </NavLink>
-              
+                            {/* --- NEW LINK --- */}
+                            <NavLink to="/json-data" className={navLinkClass}>
+                <Database size={18} className="mr-1 sm:mr-1.5" /> {/* Added JSON Data icon */}
+                JSON Data
+              </NavLink>
+              {/* --- END NEW LINK --- */}
             </div>
           </div>
         </div>

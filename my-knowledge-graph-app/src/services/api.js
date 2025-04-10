@@ -24,7 +24,51 @@ export const createGraphFromPDF = (file, limit = 10) => {
     },
   });
 };
+export const ingestJsonFile = (file, nodeTable = 'Node', relTable = null) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  // Construct query parameters
+  const params = new URLSearchParams();
+  params.append('node_table', nodeTable);
+  if (relTable) {
+    params.append('rel_table', relTable);
+  }
+  return apiClient.post(`/ingest_json_file?${params.toString()}`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+};
 
+/** Ingests a JSON string */
+export const ingestJsonString = (jsonString, nodeTable = 'Node', relTable = null) => {
+  // Construct query parameters
+  const params = new URLSearchParams();
+  params.append('node_table', nodeTable);
+  if (relTable) {
+    params.append('rel_table', relTable);
+  }
+  // Pass JSON string directly in the body, FastAPI uses Body(...)
+  return apiClient.post(`/ingest_json_string?${params.toString()}`, jsonString, {
+     headers: { 'Content-Type': 'application/json' }, // Ensure correct content type for string
+  });
+};
+
+/** Retrieves all JSON node tables */
+export const getJsonTables = (jsonOnly = true) => {
+  return apiClient.get('/json_nodes', { params: { json_only: jsonOnly } });
+};
+
+/** Retrieves nodes from a specific JSON table by its ID */
+export const getJsonTableNodesById = (tableId, nodeId = null, nodeName = null) => {
+    const params = {};
+    if (nodeId) params.id = nodeId;
+    if (nodeName) params.name = nodeName;
+    return apiClient.get(`/json_nodes_by_id/${tableId}`, { params });
+};
+
+/** Queries a specific JSON table using NLP */
+export const queryJsonTable = (tableId, query) => {
+  return apiClient.get(`/query_json/${tableId}`, { params: { query } });
+};
 // --- Topic Endpoints ---
 export const getAllTopics = () => {
   return apiClient.get('/topics');
