@@ -67,7 +67,7 @@ class LlmResponseParser:
         self,
         llm_response: str,
         baml_options: BamlCallOptions = {},
-    ) -> types.FinalResponse:
+    ) -> types.CasualResponse:
       __tb__ = baml_options.get("tb", None)
       if __tb__ is not None:
         tb = __tb__._tb # type: ignore (we know how to use this private attribute)
@@ -87,7 +87,7 @@ class LlmResponseParser:
         __cr__,
       )
 
-      return cast(types.FinalResponse, parsed)
+      return cast(types.CasualResponse, parsed)
     
     def CheckSubtopicRelevance(
         self,
@@ -390,7 +390,7 @@ class LlmStreamParser:
         self,
         llm_response: str,
         baml_options: BamlCallOptions = {},
-    ) -> partial_types.FinalResponse:
+    ) -> partial_types.CasualResponse:
       __tb__ = baml_options.get("tb", None)
       if __tb__ is not None:
         tb = __tb__._tb # type: ignore (we know how to use this private attribute)
@@ -410,7 +410,7 @@ class LlmStreamParser:
         __cr__,
       )
 
-      return cast(partial_types.FinalResponse, parsed)
+      return cast(partial_types.CasualResponse, parsed)
     
     def CheckSubtopicRelevance(
         self,

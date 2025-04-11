@@ -23,14 +23,14 @@ class CasualResponse {
   queryUsed string @stream.done @description("NIL")
   rawResults string @stream.done @description("NIL")
 }
-function CasualGenerator(question: string) -> FinalResponse {
+function CasualGenerator(question: string) -> CasualResponse {
   client GeminiGroqFallback
   prompt #"
     Reply to the user in a casual, friendly manner.
     Use the following context to provide a relevant answer.
     If the context doesn't contain relevant information, acknowledge that and provide a general response.
     App details:
-    
+
     User: {{ question }}
 
     {{ ctx.output_format }}

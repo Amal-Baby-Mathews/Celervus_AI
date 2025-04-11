@@ -129,7 +129,7 @@ class BamlSyncClient:
         self,
         question: str,
         baml_options: BamlCallOptions = {},
-    ) -> types.FinalResponse:
+    ) -> types.CasualResponse:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
       __tb__ = options.get("tb", None)
       if __tb__ is not None:
@@ -150,7 +150,7 @@ class BamlSyncClient:
         __cr__,
         collectors,
       )
-      return cast(types.FinalResponse, raw.cast_to(types, types, partial_types, False))
+      return cast(types.CasualResponse, raw.cast_to(types, types, partial_types, False))
     
     def CheckSubtopicRelevance(
         self,
@@ -475,7 +475,7 @@ class BamlStreamClient:
         self,
         question: str,
         baml_options: BamlCallOptions = {},
-    ) -> baml_py.BamlSyncStream[partial_types.FinalResponse, types.FinalResponse]:
+    ) -> baml_py.BamlSyncStream[partial_types.CasualResponse, types.CasualResponse]:
       options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
       __tb__ = options.get("tb", None)
       if __tb__ is not None:
@@ -498,10 +498,10 @@ class BamlStreamClient:
         collectors,
       )
 
-      return baml_py.BamlSyncStream[partial_types.FinalResponse, types.FinalResponse](
+      return baml_py.BamlSyncStream[partial_types.CasualResponse, types.CasualResponse](
         raw,
-        lambda x: cast(partial_types.FinalResponse, x.cast_to(types, types, partial_types, True)),
-        lambda x: cast(types.FinalResponse, x.cast_to(types, types, partial_types, False)),
+        lambda x: cast(partial_types.CasualResponse, x.cast_to(types, types, partial_types, True)),
+        lambda x: cast(types.CasualResponse, x.cast_to(types, types, partial_types, False)),
         self.__ctx_manager.get(),
       )
     

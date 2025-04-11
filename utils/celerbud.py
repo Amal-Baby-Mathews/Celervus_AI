@@ -1,7 +1,7 @@
 import asyncio
-from typing import List, Optional
+from typing import Iterator, List, Optional
 from baml_client import b
-from baml_client.types import ChatMessage, ContextSource, ChatResponse, BulletPoints,GraphResult,GraphSchema
+from baml_client.types import ChatMessage, ContextSource, ChatResponse, BulletPoints,GraphResult,GraphSchema, GraphQuery, QueryIntent, FinalResponse, CasualResponse
 import os
 from dotenv import load_dotenv
 from kuzu_init import KuzuDBManager
@@ -85,102 +85,105 @@ class BAMLFunctions:
         sorted_context = sorted(all_context, key=lambda c: c.relevanceScore, reverse=True)
         
         return sorted_context[:2]  # Return top 2 most relevant context sources
-    def query_graph(self, query: str) -> str:
-            """Queries a graph database using BAML and streams the natural language response.
+    def query_graph(self, query: str) -> Iterator[str]:
+            """Queries the graph database or responds conversationally, streaming results in real-time.
 
             Args:
-                query (str): The natural language question to query the graph database.
+                query (str): The natural language question or statement from the user.
 
-            Returns:
-                str: The final natural language answer based on the query results.
+            Yields:
+                str: Incremental updates (e.g., partial answers, final response) as plain text.
             """
             try:
-                print(f"Starting query_graph with query: {query}")
+                yield f"Starting query processing: '{query}'\n"
 
-                # Step 1: Retrieve the schema from KuzuDB
-                print("Retrieving schema from KuzuDB...")
-                schema_str = self.kuzu_client.get_schema()
-                print(f"Schema retrieved as string:\n{schema_str}")
+                # Step 1: Classify the query intent using BAML
+                yield "Classifying query intent...\n"
+                intent: QueryIntent = self.client.ClassifyQueryIntent(userQuery=query)
+                yield f"Intent: requiresGraphQuery={intent.requiresGraphQuery}, type={intent.intentType}, reasoning='{intent.reasoning}'\n"
 
-                # Parse the structured string back into GraphSchema
-                nodes = []
-                relationships = []
-                properties = []
-                
-                # Extract nodes
-                node_section = re.search(r"Nodes:\n(.*?)(?:\nRelationships:|$)", schema_str, re.DOTALL)
-                if node_section and "None" not in node_section.group(1):
-                    for line in node_section.group(1).splitlines():
-                        if line.strip().startswith("- "):
-                            nodes.append(line.strip()[2:])  # Remove "  - "
+                if intent.requiresGraphQuery:
+                    # Graph query workflow
+                    yield "Proceeding with graph query workflow...\n"
 
-                # Extract relationships
-                rel_section = re.search(r"Relationships:\n(.*?)(?:\nProperties:|$)", schema_str, re.DOTALL)
-                if rel_section and "None" not in rel_section.group(1):
-                    for line in rel_section.group(1).splitlines():
-                        if line.strip().startswith("- "):
-                            relationships.append(line.strip()[2:])
+                    # Retrieve the schema from KuzuDB
+                    yield "Retrieving schema from KuzuDB...\n"
+                    schema_str = self.kuzu_client.get_schema()  # Replace with your schema retrieval method
+                    yield f"Schema retrieved:\n{schema_str}\n"
 
-                # Extract properties
-                prop_section = re.search(r"Properties:\n(.*)", schema_str, re.DOTALL)
-                if prop_section and "None" not in prop_section.group():
-                    for line in prop_section.group(1).splitlines():
-                        if line.strip().startswith("- "):
-                            properties.append(line.strip()[2:])
+                    # Parse the schema into GraphSchema
+                    nodes, relationships, properties = [], [], []
+                    node_section = re.search(r"Nodes:\n(.*?)(?:\nRelationships:|$)", schema_str, re.DOTALL)
+                    if node_section and "None" not in node_section.group(1):
+                        for line in node_section.group(1).splitlines():
+                            if line.strip().startswith("- "):
+                                nodes.append(line.strip()[2:])
+                    rel_section = re.search(r"Relationships:\n(.*?)(?:\nProperties:|$)", schema_str, re.DOTALL)
+                    if rel_section and "None" not in rel_section.group(1):
+                        for line in rel_section.group(1).splitlines():
+                            if line.strip().startswith("- "):
+                                relationships.append(line.strip()[2:])
+                    prop_section = re.search(r"Properties:\n(.*)", schema_str, re.DOTALL)
+                    if prop_section and "None" not in prop_section.group():
+                        for line in prop_section.group(1).splitlines():
+                            if line.strip().startswith("- "):
+                                properties.append(line.strip()[2:])
 
-                schema = GraphSchema(nodes=nodes, relationships=relationships, properties=properties)
-                print(f"Parsed schema: Nodes - {schema.nodes}, Relationships - {schema.relationships}, Properties - {schema.properties}")
-                
-                if not schema.nodes and not schema.relationships:
-                    return "Error: No schema found in the database."
+                    schema = GraphSchema(nodes=nodes, relationships=relationships, properties=properties)
+                    yield f"Parsed schema: Nodes - {schema.nodes}, Relationships - {schema.relationships}\n"
 
-                # Step 2: Generate an OpenCypher query using BAML
-                print("Generating OpenCypher query using BAML...")
-                graph_query = self.client.GenerateGraphQuery(question=query, schema=schema)
-                cypher_query = graph_query.query
-                print(f"Generated Cypher query: {cypher_query}")
-                if not cypher_query:
-                    return "Error: Failed to generate a valid Cypher query."
+                    if not schema.nodes and not schema.relationships:
+                        yield "Error: No schema found in the database.\n"
+                        return
 
-                # Step 3: Execute the query against KuzuDB
-                print("Executing Cypher query against KuzuDB...")
-                response = self.kuzu_client.conn.execute(cypher_query)
-                result_data = []
-                while response.has_next():
-                    result_data.append(response.get_next())
-                print(f"Query execution results: {result_data}")
+                    # Generate OpenCypher query
+                    yield "Generating OpenCypher query using BAML...\n"
+                    graph_query: GraphQuery = self.client.GenerateGraphQuery(question=query, schema=schema)
+                    cypher_query = graph_query.query
+                    yield f"Generated Cypher query: {cypher_query}\n"
+                    if not cypher_query:
+                        yield "Error: Failed to generate a valid Cypher query.\n"
+                        return
 
-                # Convert result to a string representation
-                result_str = "\n".join([str(row) for row in result_data]) if result_data else "No results found."
-                print(f"Formatted query results: {result_str}")
-                graph_result = GraphResult(result=result_str)
+                    # Execute the query
+                    yield "Executing Cypher query...\n"
+                    response = self.kuzu_client.conn.execute(cypher_query)
+                    result_data = []
+                    while response.has_next():
+                        result_data.append(response.get_next())
+                    result_str = "\n".join([str(row) for row in result_data]) if result_data else "No results found."
+                    yield f"Query results: {result_str}\n"
+                    graph_result = GraphResult(result=result_str)
 
-                # Step 4: Analyze the results using BAML with streaming
-                print("Analyzing results using BAML with streaming...")
-                stream = self.client.stream.AnalyzeResults(
-                    question=query,
-                    query=cypher_query,
-                    results=graph_result
-                )
+                    # Analyze results with streaming
+                    yield "Analyzing results using BAML...\n"
+                    stream = self.client.stream.AnalyzeResults(
+                        question=query,
+                        query=cypher_query,
+                        results=graph_result
+                    )
 
-                # Process stream as it comes in
-                for partial in stream:# type: ignore
-                    if partial.answer:
-                        print(f"Current answer: {partial.answer.value}")
-                        print(f"Stream state: {partial.answer.state}")
-                    if partial.queryUsed:  # Only appears when complete due to @stream.done
-                        print(f"Query: {partial.queryUsed}")
-                    if partial.rawResults:  # Only appears when complete due to @stream.done
-                        print(f"Results: {partial.rawResults}")
+                    # Stream partial responses
+                    for partial in stream:
+                        if partial.answer:
+                            yield f"Partial answer: {partial.answer.value} (State: {partial.answer.state})\n"
+                        if partial.queryUsed:
+                            yield f"Query used: {partial.queryUsed}\n"
+                        if partial.rawResults:
+                            yield f"Raw results: {partial.rawResults}\n"
 
-                # Step 5: Get final validated response after stream completes
-                final = stream.get_final_response() # type: ignore
-                print(f"Final natural language response: {final.answer}")
-                return final.answer
+                    # Final response
+                    final: FinalResponse = stream.get_final_response()
+                    yield f"Final answer: {final.answer}\n"
+
+                else:
+                    # Casual conversation workflow
+                    yield "Proceeding with casual conversation...\n"
+                    casual_response: CasualResponse = self.client.CasualGenerator(question=query)
+                    yield f"Answer: {casual_response.answer}\n"
 
             except Exception as e:
-                print(f"Error querying graph: {e}")
-                return f"Error: Unable to process query '{query}' due to {str(e)}"
+                yield f"Error: Unable to process query '{query}' due to {str(e)}\n"
 if __name__ == "__main__":
     shared_db_manager = KuzuDBManager(db_path="./kuzu_db", in_memory=False)
     celerbud = BAMLFunctions(kuzu_client=shared_db_manager)  # Assuming proper initialization
