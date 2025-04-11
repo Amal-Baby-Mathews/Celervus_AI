@@ -60,6 +60,29 @@ class HttpRequest:
         False,
       )
     
+    def CasualGenerator(
+        self,
+        question: str,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.HTTPRequest:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      return self.__runtime.build_request_sync(
+        "CasualGenerator",
+        {
+          "question": question,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        False,
+      )
+    
     def CheckSubtopicRelevance(
         self,
         text: str,
@@ -76,6 +99,29 @@ class HttpRequest:
         "CheckSubtopicRelevance",
         {
           "text": text,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        False,
+      )
+    
+    def ClassifyQueryIntent(
+        self,
+        userQuery: str,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.HTTPRequest:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      return self.__runtime.build_request_sync(
+        "ClassifyQueryIntent",
+        {
+          "userQuery": userQuery,
         },
         self.__ctx_manager.get(),
         tb,
@@ -301,6 +347,29 @@ class HttpStreamRequest:
         True,
       )
     
+    def CasualGenerator(
+        self,
+        question: str,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.HTTPRequest:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      return self.__runtime.build_request_sync(
+        "CasualGenerator",
+        {
+          "question": question,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        True,
+      )
+    
     def CheckSubtopicRelevance(
         self,
         text: str,
@@ -317,6 +386,29 @@ class HttpStreamRequest:
         "CheckSubtopicRelevance",
         {
           "text": text,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        True,
+      )
+    
+    def ClassifyQueryIntent(
+        self,
+        userQuery: str,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.HTTPRequest:
+      __tb__ = baml_options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = baml_options.get("client_registry", None)
+
+      return self.__runtime.build_request_sync(
+        "ClassifyQueryIntent",
+        {
+          "userQuery": userQuery,
         },
         self.__ctx_manager.get(),
         tb,

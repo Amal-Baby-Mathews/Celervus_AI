@@ -18,8 +18,24 @@ class ChatResponse {
   usedContext ContextSource[] @description("Sources used to generate the response")
   confidence "high" | "medium" | "low" @description("Confidence level in the response")
 }
+class CasualResponse {
+  answer string @stream.with_state @description("Casual Natural Language response")
+  queryUsed string @stream.done @description("NIL")
+  rawResults string @stream.done @description("NIL")
+}
+function CasualGenerator(question: string) -> FinalResponse {
+  client GeminiGroqFallback
+  prompt #"
+    Reply to the user in a casual, friendly manner.
+    Use the following context to provide a relevant answer.
+    If the context doesn't contain relevant information, acknowledge that and provide a general response.
+    App details:
+    
+    User: {{ question }}
 
-
+    {{ ctx.output_format }}
+  "#
+}
 // Main chat function with streaming
 function StreamingChat(
   messages: ChatMessage[],
@@ -113,7 +129,38 @@ function CheckSubtopicRelevance(text: string) -> float {
     {{ _.role("user") }} {{ text }}
   "#
 }
+class QueryIntent {
+  requiresGraphQuery bool @description("Whether the query requires accessing a graph database")
+  intentType "casual_conversation" | "graph_query" | "unknown" @description("The type of intent detected in the query")
+  reasoning string @description("Explanation for why this classification was made")
+}
 
+function ClassifyQueryIntent(userQuery: string) -> QueryIntent {
+  client GeminiGroqFallback
+  prompt #"
+    Determine if the given user query requires accessing a graph database or if it's just casual conversation.
+    Consider queries about relationships between entities, data lookup, or structured information as requiring graph queries.
+    Casual conversation includes greetings, small talk, or general questions not requiring data lookup.
+
+    {{ ctx.output_format }}
+
+    {{ _.role("user") }} {{ userQuery }}
+  "#
+}
+
+test CasualConversationTest {
+  functions [ClassifyQueryIntent]
+  args {
+    userQuery "Hello! How are you doing today?"
+  }
+}
+
+test GraphQueryTest {
+  functions [ClassifyQueryIntent]
+  args {
+    userQuery "Show me all employees who report to Sarah Johnson and have been at the company for more than 5 years."
+  }
+}
 test BasicLowRelevanceTest {
   functions [CheckSubtopicRelevance]
   args {

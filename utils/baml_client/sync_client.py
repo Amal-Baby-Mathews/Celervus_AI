@@ -125,6 +125,33 @@ class BamlSyncClient:
       )
       return cast(types.FinalResponse, raw.cast_to(types, types, partial_types, False))
     
+    def CasualGenerator(
+        self,
+        question: str,
+        baml_options: BamlCallOptions = {},
+    ) -> types.FinalResponse:
+      options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
+      __tb__ = options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = options.get("client_registry", None)
+      collector = options.get("collector", None)
+      collectors = collector if isinstance(collector, list) else [collector] if collector is not None else []
+
+      raw = self.__runtime.call_function_sync(
+        "CasualGenerator",
+        {
+          "question": question,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        collectors,
+      )
+      return cast(types.FinalResponse, raw.cast_to(types, types, partial_types, False))
+    
     def CheckSubtopicRelevance(
         self,
         text: str,
@@ -151,6 +178,33 @@ class BamlSyncClient:
         collectors,
       )
       return cast(float, raw.cast_to(types, types, partial_types, False))
+    
+    def ClassifyQueryIntent(
+        self,
+        userQuery: str,
+        baml_options: BamlCallOptions = {},
+    ) -> types.QueryIntent:
+      options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
+      __tb__ = options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = options.get("client_registry", None)
+      collector = options.get("collector", None)
+      collectors = collector if isinstance(collector, list) else [collector] if collector is not None else []
+
+      raw = self.__runtime.call_function_sync(
+        "ClassifyQueryIntent",
+        {
+          "userQuery": userQuery,
+        },
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        collectors,
+      )
+      return cast(types.QueryIntent, raw.cast_to(types, types, partial_types, False))
     
     def ExtractBulletPoints(
         self,
@@ -417,6 +471,40 @@ class BamlStreamClient:
         self.__ctx_manager.get(),
       )
     
+    def CasualGenerator(
+        self,
+        question: str,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.BamlSyncStream[partial_types.FinalResponse, types.FinalResponse]:
+      options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
+      __tb__ = options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = options.get("client_registry", None)
+      collector = options.get("collector", None)
+      collectors = collector if isinstance(collector, list) else [collector] if collector is not None else []
+
+      raw = self.__runtime.stream_function_sync(
+        "CasualGenerator",
+        {
+          "question": question,
+        },
+        None,
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        collectors,
+      )
+
+      return baml_py.BamlSyncStream[partial_types.FinalResponse, types.FinalResponse](
+        raw,
+        lambda x: cast(partial_types.FinalResponse, x.cast_to(types, types, partial_types, True)),
+        lambda x: cast(types.FinalResponse, x.cast_to(types, types, partial_types, False)),
+        self.__ctx_manager.get(),
+      )
+    
     def CheckSubtopicRelevance(
         self,
         text: str,
@@ -448,6 +536,40 @@ class BamlStreamClient:
         raw,
         lambda x: cast(Optional[float], x.cast_to(types, types, partial_types, True)),
         lambda x: cast(float, x.cast_to(types, types, partial_types, False)),
+        self.__ctx_manager.get(),
+      )
+    
+    def ClassifyQueryIntent(
+        self,
+        userQuery: str,
+        baml_options: BamlCallOptions = {},
+    ) -> baml_py.BamlSyncStream[partial_types.QueryIntent, types.QueryIntent]:
+      options: BamlCallOptions = {**self.__baml_options, **(baml_options or {})}
+      __tb__ = options.get("tb", None)
+      if __tb__ is not None:
+        tb = __tb__._tb # type: ignore (we know how to use this private attribute)
+      else:
+        tb = None
+      __cr__ = options.get("client_registry", None)
+      collector = options.get("collector", None)
+      collectors = collector if isinstance(collector, list) else [collector] if collector is not None else []
+
+      raw = self.__runtime.stream_function_sync(
+        "ClassifyQueryIntent",
+        {
+          "userQuery": userQuery,
+        },
+        None,
+        self.__ctx_manager.get(),
+        tb,
+        __cr__,
+        collectors,
+      )
+
+      return baml_py.BamlSyncStream[partial_types.QueryIntent, types.QueryIntent](
+        raw,
+        lambda x: cast(partial_types.QueryIntent, x.cast_to(types, types, partial_types, True)),
+        lambda x: cast(types.QueryIntent, x.cast_to(types, types, partial_types, False)),
         self.__ctx_manager.get(),
       )
     

@@ -40,6 +40,11 @@ class BulletPoints(BaseModel):
     mainIdea: Optional[str] = None
     complexity: Optional[Union[Literal["basic"], Literal["intermediate"], Literal["advanced"]]] = None
 
+class CasualResponse(BaseModel):
+    answer: StreamState[Optional[str]]
+    queryUsed: Optional[str] = None
+    rawResults: Optional[str] = None
+
 class ChatMessage(BaseModel):
     role: Optional[Union[Literal["user"], Literal["assistant"]]] = None
     content: Optional[str] = None
@@ -70,6 +75,11 @@ class GraphSchema(BaseModel):
     nodes: List[str]
     relationships: List[str]
     properties: List[str]
+
+class QueryIntent(BaseModel):
+    requiresGraphQuery: Optional[bool] = None
+    intentType: Optional[Union[Literal["casual_conversation"], Literal["graph_query"], Literal["unknown"]]] = None
+    reasoning: Optional[str] = None
 
 class Resume(BaseModel):
     name: Optional[str] = None

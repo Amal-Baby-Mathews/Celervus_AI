@@ -25,7 +25,7 @@ function JsonTableDetails({ nodes, isLoading, error }) {
     >
       {nodes.map((node, index) => (
         <motion.div
-          key={node._id || index} // Use node._id if available, otherwise index
+          key={node.id || index} // Use node._id if available, otherwise index
           className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md shadow-sm border border-gray-200 dark:border-gray-600"
           initial={{ x: -10, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}

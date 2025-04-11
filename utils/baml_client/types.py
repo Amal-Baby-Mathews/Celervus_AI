@@ -45,6 +45,11 @@ class BulletPoints(BaseModel):
     mainIdea: str
     complexity: Union[Literal["basic"], Literal["intermediate"], Literal["advanced"]]
 
+class CasualResponse(BaseModel):
+    answer: str
+    queryUsed: str
+    rawResults: str
+
 class ChatMessage(BaseModel):
     role: Union[Literal["user"], Literal["assistant"]]
     content: str
@@ -75,6 +80,11 @@ class GraphSchema(BaseModel):
     nodes: List[str]
     relationships: List[str]
     properties: List[str]
+
+class QueryIntent(BaseModel):
+    requiresGraphQuery: bool
+    intentType: Union[Literal["casual_conversation"], Literal["graph_query"], Literal["unknown"]]
+    reasoning: str
 
 class Resume(BaseModel):
     name: str
