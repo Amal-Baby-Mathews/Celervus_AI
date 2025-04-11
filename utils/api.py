@@ -1,3 +1,4 @@
+import json
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
@@ -162,11 +163,11 @@ async def ingest_json_file(file: UploadFile = File(...), node_table: str = "Node
 
 # New endpoint to ingest a JSON string
 @app.post("/ingest_json_string")
-async def ingest_json_string(json_str: str = Body(...), node_table: str = "Node", rel_table: Optional[str] = None):
+async def ingest_json_string(json_data: Any = Body(...), node_table: str = "Node", rel_table: Optional[str] = None):
     """Ingest a JSON string into the KuzuDB knowledge graph.
 
     Args:
-        json_str (str): The JSON string to ingest.
+        json_data (Any): The JSON data (array, object, or string) to ingest.
         node_table (str): Name of the node table (default: 'Node').
         rel_table (Optional[str]): Name of the relationship table (if applicable).
 
@@ -174,15 +175,25 @@ async def ingest_json_string(json_str: str = Body(...), node_table: str = "Node"
         dict: Success message or error.
     """
     try:
+        # Convert the input to a JSON string, regardless of its initial type
+        if isinstance(json_data, str):
+            # If it’s already a string, validate it’s proper JSON
+            json.loads(json_data)
+            json_str = json_data
+        else:
+            # If it’s an object/array, stringify it
+            json_str = json.dumps(json_data)
+
         jkg = JSONKnowledgeGraph(db_manager=shared_db_manager)
         jkg.ingest_json_string(json_str, node_table=node_table, rel_table=rel_table)
         return {"message": "Successfully ingested JSON string into table(s)."}
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON format: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error ingesting JSON string: {str(e)}")
 
     # Test with curl:
-    # curl -X POST "http://localhost:8008/ingest_json_string?node_table=Person" -H "Content-Type: application/json" -d '"[{\"id\": \"p1\", \"name\": \"Gregory\"}]"'
-
+    # curl -X POST "http://localhost:8008/ingest_json_string?node_table=Person" -H "Content-Type: application/json" -d '[{"id": "p1", "name": "Gregory"}]'
 @app.get("/json_nodes")
 def get_json_nodes(json_only: bool = True):
     """Retrieve all JSON-ingested node tables with their IDs in the knowledge graph.

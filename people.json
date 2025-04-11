@@ -1,38 +1,88 @@
 [
     {
-        "p_id": "p1",
-        "name": "Gregory",
+        "id": "p1",
+        "name": "Gregory Smith",
+        "age": 35,
         "info": {
             "height": 1.81,
             "weight": 75.5,
-            "age": 35,
+            "occupation": "Software Engineer",
             "insurance_provider": [
                 {
                     "type": "health",
                     "name": "Blue Cross Blue Shield",
-                    "policy_number": "1536425345"
+                    "policy_number": "1536425345",
+                    "start_date": "2015-03-01"
+                },
+                {
+                    "type": "dental",
+                    "name": "Delta Dental",
+                    "policy_number": "D789123456",
+                    "start_date": "2016-06-15"
                 }
             ]
-        }
+        },
+        "conditions": [
+            {
+                "condition_id": "c1",
+                "name": "Diabetes",
+                "since": 2019
+            },
+            {
+                "condition_id": "c3",
+                "name": "Asthma",
+                "since": 2020
+            }
+        ]
     },
     {
-        "p_id": "p2",
-        "name": "Alicia",
+        "id": "p2",
+        "name": "Alicia Johnson",
+        "age": 28,
         "info": {
             "height": 1.65,
             "weight": 60.1,
-            "age": 28,
+            "occupation": "Teacher",
             "insurance_provider": [
                 {
                     "type": "health",
                     "name": "Aetna",
-                    "policy_number": "9876543210"
+                    "policy_number": "9876543210",
+                    "start_date": "2018-01-10"
                 }
             ]
-        }
+        },
+        "conditions": [
+            {
+                "condition_id": "c2",
+                "name": "Hypertension",
+                "since": 2015
+            }
+        ]
     },
     {
-        "p_id": "p3",
-        "name": "Rebecca"
+        "id": "p3",
+        "name": "Rebecca Lee",
+        "age": 42,
+        "info": {
+            "height": 1.72,
+            "weight": 68.0,
+            "occupation": "Nurse",
+            "insurance_provider": [
+                {
+                    "type": "health",
+                    "name": "Blue Cross Blue Shield",
+                    "policy_number": "4567891234",
+                    "start_date": "2010-09-01"
+                }
+            ]
+        },
+        "conditions": [
+            {
+                "condition_id": "c1",
+                "name": "Diabetes",
+                "since": 2017
+            }
+        ]
     }
 ]

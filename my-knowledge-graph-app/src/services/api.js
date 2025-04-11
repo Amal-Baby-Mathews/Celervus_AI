@@ -38,17 +38,19 @@ export const ingestJsonFile = (file, nodeTable = 'Node', relTable = null) => {
   });
 };
 
-/** Ingests a JSON string */
 export const ingestJsonString = (jsonString, nodeTable = 'Node', relTable = null) => {
-  // Construct query parameters
+  // Ensure jsonString is a string
+  const ensuredString = typeof jsonString === 'string' ? jsonString : JSON.stringify(jsonString);
+  console.log('Sending JSON string to API:', ensuredString); // Debug payload
+
   const params = new URLSearchParams();
   params.append('node_table', nodeTable);
   if (relTable) {
     params.append('rel_table', relTable);
   }
-  // Pass JSON string directly in the body, FastAPI uses Body(...)
-  return apiClient.post(`/ingest_json_string?${params.toString()}`, jsonString, {
-     headers: { 'Content-Type': 'application/json' }, // Ensure correct content type for string
+
+  return apiClient.post(`/ingest_json_string?${params.toString()}`, ensuredString, {
+    headers: { 'Content-Type': 'application/json' },
   });
 };
 
