@@ -34,7 +34,8 @@ const TopicItem = ({ topic, onSelect, isSelected }) => {
 const SubtopicItem = ({ subtopic }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [enlargedImage, setEnlargedImage] = useState(null);
-
+  // State for the nested expansion of the full text *within this subtopic item*
+  const [isFullTextExpanded, setIsFullTextExpanded] = useState(false);
   // Ensure bullet_points is always an array
   const bulletPoints = Array.isArray(subtopic.bullet_points) ? subtopic.bullet_points : [];
 
@@ -48,70 +49,104 @@ const SubtopicItem = ({ subtopic }) => {
 
   return (
     <motion.div
-      layout
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -20 }}
-      transition={{ duration: 0.3, ease: 'easeOut' }}
-      className="ml-4 sm:ml-6 mb-3 bg-white dark:bg-gray-800 rounded-md shadow-sm border border-gray-200 dark:border-gray-700"
+    layout
+    initial={{ opacity: 0, x: -20 }}
+    animate={{ opacity: 1, x: 0 }}
+    exit={{ opacity: 0, x: -20 }}
+    transition={{ duration: 0.3, ease: 'easeOut' }}
+    className="ml-4 sm:ml-6 mb-3 bg-white dark:bg-gray-800 rounded-md shadow-sm border border-gray-200 dark:border-gray-700"
+  >
+    {/* Main Expander Button (No Change) */}
+    <button
+      onClick={() => setIsExpanded(!isExpanded)}
+      className="w-full text-left p-3 sm:p-4 flex items-center justify-between text-sm sm:text-base font-medium text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
     >
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full text-left p-3 sm:p-4 flex items-center justify-between text-sm sm:text-base font-medium text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
-      >
-        <div className="flex items-center">
-          <FileText size={16} className="mr-2 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-          {subtopic.name}
-        </div>
-        <ChevronRight size={16} className={`transform transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-      </button>
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3, ease: 'easeInOut' }}
-            className="px-3 sm:px-4 pb-3 sm:pb-4 text-sm text-gray-700 dark:text-gray-300 overflow-hidden"
-          >
-            {/* Display Full Text */}
-            <p className="mb-2">{subtopic.full_text || 'No full text available.'}</p>
+      <div className="flex items-center">
+        <FileText size={16} className="mr-2 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+        {subtopic.name}
+      </div>
+      <ChevronRight size={16} className={`transform transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+    </button>
 
-            {/* Display Bullet Points */}
+    {/* Main Expandable Content Area */}
+    <AnimatePresence>
+      {isExpanded && (
+        <motion.div
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: 'auto', opacity: 1 }}
+          exit={{ height: 0, opacity: 0 }}
+          transition={{ duration: 0.3, ease: 'easeInOut' }}
+          // Removed padding here, will apply it inside sections
+          className="overflow-hidden"
+        >
+          <div className="px-3 sm:px-4 pt-3 sm:pt-4 pb-3 sm:pb-4"> {/* Add padding back to inner div */}
+            {/* Display Bullet Points (Highlighted Container - Always visible when main is expanded) */}
             {bulletPoints.length > 0 && (
-              <div className="mt-2">
-                <h5 className="text-xs sm:text-sm font-semibold text-gray-600 dark:text-gray-400 mb-1 flex items-center">
-                  <List size={14} className="mr-1.5" /> Key Points:
+              <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-md mb-3 border border-blue-100 dark:border-blue-800/50">
+                <h5 className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1.5 flex items-center">
+                  <List size={14} className="mr-1.5 text-blue-600 dark:text-blue-400" /> Key Points:
                 </h5>
-                <ul className="list-disc list-inside text-xs sm:text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                <ul className="list-disc list-inside text-xs sm:text-sm text-gray-600 dark:text-gray-300 space-y-1 pl-1">
                   {bulletPoints.map((point, index) => (
-                    <li key={index}>{point}</li>
+                    <li key={`${point.slice(0, 10)}-${index}`}>{point}</li>
                   ))}
                 </ul>
               </div>
             )}
 
-            {/* Display Images */}
+            {/* --- Start: Nested Expandable Full Text Section --- */}
+            {subtopic.full_text && ( // Only show this section if full_text exists
+              <div className="mt-3 border border-gray-200 dark:border-gray-600 rounded-md">
+                <button
+                  onClick={() => setIsFullTextExpanded(!isFullTextExpanded)}
+                  className="w-full text-left p-2 px-3 flex items-center justify-between text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-150 rounded-t-md" // Rounded top only
+                >
+                  <span>Complete text extracted</span>
+                  <ChevronRight size={14} className={`transform transition-transform ${isFullTextExpanded ? 'rotate-90' : ''}`} />
+                </button>
+                <AnimatePresence>
+                  {isFullTextExpanded && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.25, ease: 'easeInOut' }}
+                      className="overflow-hidden border-t border-gray-200 dark:border-gray-600" // Separator line
+                    >
+                      <p className="p-3 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words"> {/* Added whitespace handling */}
+                        {subtopic.full_text}
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
+            {/* --- End: Nested Expandable Full Text Section --- */}
+
+
+            {/* Display Images (Remains at the bottom, outside the nested section) */}
             {subtopic.image_metadata && subtopic.image_metadata.length > 0 && (
-              <div className="mt-3 pt-2 border-t border-gray-200 dark:border-gray-700">
+              <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700"> {/* Consistent spacing */}
                 <h5 className="text-xs sm:text-sm font-semibold text-gray-600 dark:text-gray-400 mb-2">Related Images:</h5>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {subtopic.image_metadata.map((img, index) => (
-                    <motion.button
-                      key={img.url || index}
+                     // ... (image button code remains the same) ...
+                     <motion.button
+                      key={img.url || `${img.image_name}-${index}`}
                       onClick={() => handleImageClick(`${API_BASE_URL}${img.url}`)}
-                      className="w-full h-auto rounded border border-gray-300 dark:border-gray-600 focus:outline-none"
-                      whileHover={{ scale: 1.05 }}
+                      className="w-full h-auto rounded border border-gray-300 dark:border-gray-600 focus:outline-none overflow-hidden group"
+                      whileHover={{ scale: 1.05, zIndex: 10 }}
                       whileTap={{ scale: 0.95 }}
+                      style={{ position: 'relative' }}
                     >
                       <img
                         src={`${API_BASE_URL}${img.url}`}
                         alt={img.image_name || `Image ${index + 1}`}
-                        className="w-full h-auto object-cover rounded mb-1"
+                        className="w-full h-auto object-cover mb-1 transition-transform duration-200 group-hover:scale-110"
                         loading="lazy"
                         onError={(e) => { e.target.style.display = 'none'; }}
                       />
-                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate" title={img.image_name}>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate px-1 pb-1" title={img.image_name}>
                         {img.image_name || `Image ${index + 1}`} (Pg: {img.page_number})
                       </p>
                     </motion.button>
@@ -119,9 +154,10 @@ const SubtopicItem = ({ subtopic }) => {
                 </div>
               </div>
             )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+           </div> {/* End inner padding div */}
+        </motion.div>
+      )}
+    </AnimatePresence>
 
       {/* Enlarged Image Overlay */}
       <AnimatePresence>
@@ -219,7 +255,7 @@ const TopicList = () => {
   // Find the name of the selected topic from the initial list for the header
   // (Handles case where details are loading/failed but we still know the name)
   const selectedTopicName = topics.find(t => t.id === selectedTopicId)?.name || 'Topic Details';
-
+  
   return (
     <div className="grid md:grid-cols-3 gap-6 sm:gap-8">
       {/* Left Panel: List of Topics */}
