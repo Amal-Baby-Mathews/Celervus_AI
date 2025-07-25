@@ -19,21 +19,45 @@ class ChatResponse {
   confidence "high" | "medium" | "low" @description("Confidence level in the response")
 }
 class CasualResponse {
-  answer string @stream.with_state @description("Casual Natural Language response")
-  queryUsed string @stream.done @description("NIL")
-  rawResults string @stream.done @description("NIL")
+  answer string @stream.with_state @description("Casual natural language response streamed token-by-token")
+  queryUsed string @stream.done @description("Always 'NIL', returned when complete")
+  rawResults string @stream.done @description("Always 'NIL', returned when complete")
 }
+
 function CasualGenerator(question: string) -> CasualResponse {
   client GeminiGroqFallback
   prompt #"
-    Reply to the user in a casual, friendly manner.
-    Use the following context to provide a relevant answer.
-    If the context doesn't contain relevant information, acknowledge that and provide a general response.
-    App details:
+    Reply to the user in a casual, friendly manner based on the question provided.
+    Use the context (if any) to provide a relevant answer. If the context lacks specific information or this is a general conversational query, acknowledge it and give a helpful, casual response.
+    Always return the response in JSON format with the following schema:
+    {
+      answer: string,         // Your casual, friendly reply
+      queryUsed: 'NIL',       // Set to 'NIL' since no database query is used
+      rawResults: 'NIL'       // Set to 'NIL' since no raw results are generated
+    }
 
-    User: {{ question }}
+    ### Examples:
+    1. **Question**: 'Hello, how are you?'
+       **Response**:
+       {
+         'answer': 'Hey there! I’m doing awesome, thanks for asking! How’s your day going?',
+         'queryUsed': 'NIL',
+         'rawResults': 'NIL'
+       }
+
+    2. **Question**: 'I didn’t get this line could you explain it?:The sky is blue because of light scattering.'
+       **Response**:
+       {
+         'answer': 'No worries! That line means the sky looks blue because sunlight scatters when it hits tiny particles in the air—blue light spreads out more than other colors. Cool, right?',
+         'queryUsed': 'NIL',
+         'rawResults': 'NIL'
+       }
+
+    App details: Celervus is an advanced knowledge graph platform that transforms structured JSON data and unstructured PDF content into a dynamic, interconnected graph using KuzuDB, enabling real-time conversational queries and insights through its Celerbud AI interface powered by GraphRAG and BAML-driven natural language processing.
 
     {{ ctx.output_format }}
+
+    {{ _.role("user") }} {{ question }}
   "#
 }
 // Main chat function with streaming
