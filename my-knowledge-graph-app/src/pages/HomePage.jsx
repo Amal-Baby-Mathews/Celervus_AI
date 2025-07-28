@@ -150,6 +150,9 @@ const HomePage = () => {
                 <li>
                   <a href="#" className="hover:text-blue-400">Documentation</a>
                 </li>
+                <li>
+                  <Link to="/search" className="hover:text-blue-400">Search Topics</Link>
+                </li>
               </ul>
             </div>
             <div>

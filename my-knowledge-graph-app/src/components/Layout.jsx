@@ -32,6 +32,9 @@ const Layout = () => {
               <NavLink to="/topics" className={navLinkClass}>
                 <Network size={20} className="mr-1 sm:mr-2" /> View Topics
               </NavLink>
+              <NavLink to="/search" className={navLinkClass}>
+                <Network size={20} className="mr-1 sm:mr-2" /> Search
+              </NavLink>
               
             </div>
           </div>

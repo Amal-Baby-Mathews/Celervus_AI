@@ -5,6 +5,7 @@ import HomePage from './pages/HomePage';
 import TopicsPage from './pages/TopicsPage';
 import UploadPage from './pages/UploadPage';
 import NotFoundPage from './pages/NotFoundPage';
+import SearchPage from './pages/SearchPage';
 // Import other pages as you create them (e.g., TopicDetailPage)
 
 function App() {
@@ -13,7 +14,7 @@ function App() {
       <Route path="/" element={<Layout />}> {/* Use Layout for all nested routes */}
         <Route index element={<HomePage />} /> {/* index route for '/' */}
         <Route path="topics" element={<TopicsPage />} />
-        {/* Example detail route: <Route path="topics/:topicId" element={<TopicDetailPage />} /> */}
+        <Route path="search" element={<SearchPage />} /> {/* Add SearchPage route */}
         <Route path="upload" element={<UploadPage />} />
         <Route path="*" element={<NotFoundPage />} /> {/* Catch-all for 404 */}
       </Route>

@@ -1,6 +1,8 @@
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
+
+from pydantic import BaseModel, Field
 from pdf_extraactor import PDFKnowledgeGraph
 from fastapi import FastAPI, File, UploadFile, HTTPException
 import uvicorn
@@ -8,6 +10,9 @@ from typing import List, Dict, Optional, Any
 from fastapi.responses import StreamingResponse
 from celerbud import BAMLFunctions  # Assuming BAMLFunctions is your Celerbud class
 from kuzu_init import KuzuDBManager  # Assuming KuzuDBManager is your database manager class
+from multimodal_db import MultimodalDB  # Assuming MultimodalDB is your LanceDB manager class
+import logging
+logger= logging.getLogger("uvicorn.error")
 app = FastAPI()
 
 # Mount static files directory for images
@@ -127,7 +132,93 @@ def query_endpoint(query: str):
 
     # Test with curl (use -N for no buffering to see streaming):
     # curl -N -X GET "http://localhost:8008/query?query=What%20subtopics%20are%20under%20the%20topic%20'Barcode%20Scanning%20Procedure:%20Align%20and%20Capture%20Barcode%20Data'?"
+# Shared DB instance
+shared_multimodal_db = MultimodalDB()
 
+# ---- Pydantic Models ----
+class Entry(BaseModel):
+    text: str
+    image_path: Optional[str] = None
+    file_path: Optional[str] = None
+
+
+class UpdateRequest(BaseModel):
+    where: str = Field(..., description="Condition for update (e.g., text = 'hello')")
+    values: Optional[Dict[str, Any]] = None
+    values_sql: Optional[Dict[str, str]] = None
+
+
+class DeleteRequest(BaseModel):
+    condition: str = Field(..., description="Condition for deletion (e.g., text = 'hello')")
+
+
+# ---- API Endpoints ----
+
+@app.post("/db/add")
+def add_entries(entries: List[Entry]):
+    """Add multiple entries to LanceDB."""
+    try:
+        shared_multimodal_db.add_entries([entry.dict() for entry in entries])
+        return {"status": "success", "message": f"{len(entries)} entries added"}
+    except Exception as e:
+        logger.exception(f"Failed to add entries: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to add entries: {str(e)}")
+
+
+@app.post("/db/update")
+def update_entries(update_req: UpdateRequest):
+    """Update entries based on condition."""
+    try:
+        shared_multimodal_db.update_entries(
+            where=update_req.where,
+            values=update_req.values,
+            values_sql=update_req.values_sql,
+        )
+        return {"status": "success", "message": f"Entries updated where {update_req.where}"}
+    except Exception as e:
+        logger.exception(f"Update endpoint failed for where='{update_req.where}': {e}")
+        raise HTTPException(status_code=500, detail=f"Update failed: {str(e)}")
+
+
+@app.delete("/db/delete")
+def delete_entry(delete_req: DeleteRequest):
+    """Delete entries from LanceDB based on condition."""
+    try:
+        shared_multimodal_db.delete_entry(delete_req.condition)
+        return {"status": "success", "message": f"Entries deleted where {delete_req.condition}"}
+    except Exception as e:
+        logger.exception(f"Delete endpoint failed for condition='{delete_req.condition}': {e}")
+        raise HTTPException(status_code=500, detail=f"Deletion failed: {str(e)}")
+
+
+@app.get("/db/search")
+def hybrid_search(query: str, top_k: int = 10):
+    """Perform hybrid search with RRFReranker."""
+    try:
+        results = shared_multimodal_db.hybrid_search_with_rerank(query, top_k)
+        cleaned_results = [
+            {k: v for k, v in r.items() if k != "vector"} for r in results
+        ]
+        return {
+            "status": "success",
+            "query": query,
+            "count": len(cleaned_results),
+            "results": cleaned_results,
+        }
+    except Exception as e:
+        logger.exception(f"Search endpoint failed for query='{query}': {e}")
+        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+
+
+@app.delete("/db/drop")
+def drop_table():
+    """Drop the LanceDB table."""
+    try:
+        shared_multimodal_db.drop_table()
+        return {"status": "success", "message": "Table dropped successfully"}
+    except Exception as e:
+        logger.exception(f"Drop table failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to drop table: {str(e)}")
 # Example Usage
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8008)
