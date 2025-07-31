@@ -4,7 +4,7 @@ import { Upload, Edit, Trash, Database, Loader2 } from 'lucide-react';
 import axios from 'axios';
 
 const AddEntryForm = ({ onSuccess, onError }) => {
-  const [entries, setEntries] = useState([{ text: '', image_path: '', file_path: '' }]);
+  const [entries, setEntries] = useState([{ text: '', file_path: '', image: null }]);
   const [loading, setLoading] = useState(false);
 
   const handleAddEntry = async (e) => {
@@ -13,11 +13,22 @@ const AddEntryForm = ({ onSuccess, onError }) => {
 
     setLoading(true);
     try {
-      const response = await axios.post('http://localhost:8008/db/add', entries);
+      const formData = new FormData();
+
+      // ✅ For now, handle only the first entry (as your API expects one entry)
+      const entry = entries[0];
+      formData.append('text', entry.text);
+      if (entry.file_path) formData.append('file_path', entry.file_path);
+      if (entry.image) formData.append('image', entry.image);
+
+      const response = await axios.post('http://localhost:8008/db/add', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
       onSuccess(response.data.message);
-      setEntries([{ text: '', image_path: '', file_path: '' }]);
+      setEntries([{ text: '', file_path: '', image: null }]);
     } catch (err) {
-      onError(err.response?.data?.detail || 'Failed to add entries. Please try again.');
+      onError(err.response?.data?.detail || 'Failed to add entry. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -30,7 +41,7 @@ const AddEntryForm = ({ onSuccess, onError }) => {
   };
 
   const addEntryField = () => {
-    setEntries([...entries, { text: '', image_path: '', file_path: '' }]);
+    setEntries([...entries, { text: '', file_path: '', image: null }]);
   };
 
   return (
@@ -38,7 +49,7 @@ const AddEntryForm = ({ onSuccess, onError }) => {
       <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
         <Upload size={24} className="text-blue-600 dark:text-blue-400 mr-2" /> Add Entries
       </h3>
-      <form onSubmit={handleAddEntry}>
+      <form onSubmit={handleAddEntry} encType="multipart/form-data">
         {entries.map((entry, index) => (
           <div key={index} className="mb-4">
             <input
@@ -49,10 +60,9 @@ const AddEntryForm = ({ onSuccess, onError }) => {
               className="w-full px-4 py-2 mb-2 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-600"
             />
             <input
-              type="text"
-              value={entry.image_path}
-              onChange={(e) => handleEntryChange(index, 'image_path', e.target.value)}
-              placeholder="Image path (optional)"
+              type="file"
+              accept="image/*"
+              onChange={(e) => handleEntryChange(index, 'image', e.target.files[0])}
               className="w-full px-4 py-2 mb-2 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-600"
             />
             <input
@@ -69,7 +79,7 @@ const AddEntryForm = ({ onSuccess, onError }) => {
         </button>
         <button type="submit" disabled={loading} className="w-full px-4 py-2 bg-blue-600 text-white rounded-md shadow-md hover:bg-blue-700 transition-colors duration-200 flex items-center justify-center">
           {loading ? <Loader2 size={20} className="animate-spin mr-2" /> : <Upload size={20} className="mr-2" />}
-          Submit Entries
+          Submit Entry
         </button>
       </form>
     </motion.div>

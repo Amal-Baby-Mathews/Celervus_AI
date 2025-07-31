@@ -42,6 +42,7 @@ class MultimodalDB:
         return Schema
     def add_entries(self, entries: List[dict]):
         """Add multiple entries with text, optional image/file paths."""
+
         self.table.add(entries)
 
     def delete_entry(self, condition: str):

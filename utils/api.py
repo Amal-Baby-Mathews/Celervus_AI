@@ -1,10 +1,11 @@
+import shutil
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
 
 from pydantic import BaseModel, Field
 from pdf_extraactor import PDFKnowledgeGraph
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, Form, UploadFile, HTTPException
 import uvicorn
 from typing import List, Dict, Optional, Any
 from fastapi.responses import StreamingResponse
@@ -138,10 +139,10 @@ from fastapi.staticfiles import StaticFiles
 
 # ✅ Use absolute path for reliability
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # Directory of this script
-IMAGES_DIR = os.path.join(BASE_DIR, "datasets", "open_images_sample")
+IMAGES_DIR = os.getenv("IMAGES_DIR", "./datasets/open_images_sample")
 if not os.path.exists(IMAGES_DIR):
     os.makedirs(IMAGES_DIR)
-
+BASE_URL=os.getenv("BASE_URL", "http://localhost:8008")
 app.mount("/extra_images", StaticFiles(directory=IMAGES_DIR), name="images")
 import glob
 
@@ -172,16 +173,58 @@ class DeleteRequest(BaseModel):
 # ---- API Endpoints ----
 
 @app.post("/db/add")
-def add_entries(entries: List[Entry]):
-    """Add multiple entries to LanceDB."""
+async def add_entry(
+    text: str = Form(...),
+    file_path: Optional[str] = Form(None),
+    image: Optional[UploadFile] = File(None)
+):
+    """
+    Add a single entry with optional image.
+    - Saves image if provided.
+    - Adds entry to LanceDB with `image_path`.
+    """
+
     try:
-        shared_multimodal_db.add_entries([entry.dict() for entry in entries])
-        return {"status": "success", "message": f"{len(entries)} entries added"}
+        # ✅ Default image_path
+        saved_image_path = None
+
+        # ✅ Save image if provided
+        if image:
+            # Generate a safe file name
+            original_name = os.path.basename(image.filename)
+            safe_filename = original_name.replace(" ", "_")
+
+            # ✅ Full save path
+            save_path = os.path.join(IMAGES_DIR, safe_filename)
+
+            # ✅ Save (overwrite if exists)
+            with open(save_path, "wb") as buffer:
+                shutil.copyfileobj(image.file, buffer)
+
+            logger.info(f"Image saved at: {save_path}")
+
+            # ✅ Public URL for serving
+            saved_image_url = f"{BASE_URL}/extra_images/{safe_filename}"
+
+        # ✅ Prepare entry for DB
+        entry = {
+            "text": text,
+            "file_path": file_path,
+            "image_path": saved_image_url
+        }
+
+        # ✅ Insert into LanceDB
+        shared_multimodal_db.add_entries([entry])
+
+        return {
+            "status": "success",
+            "message": "Entry added successfully",
+            "data": entry
+        }
+
     except Exception as e:
-        logger.exception(f"Failed to add entries: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to add entries: {str(e)}")
-
-
+        logger.exception(f"Failed to add entry: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to add entry: {str(e)}")
 @app.post("/db/update")
 def update_entries(update_req: UpdateRequest):
     """Update entries based on condition."""
