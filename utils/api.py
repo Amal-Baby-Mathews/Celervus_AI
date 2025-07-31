@@ -134,7 +134,24 @@ def query_endpoint(query: str):
     # curl -N -X GET "http://localhost:8008/query?query=What%20subtopics%20are%20under%20the%20topic%20'Barcode%20Scanning%20Procedure:%20Align%20and%20Capture%20Barcode%20Data'?"
 # Shared DB instance
 shared_multimodal_db = MultimodalDB()
+from fastapi.staticfiles import StaticFiles
 
+# ✅ Use absolute path for reliability
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # Directory of this script
+IMAGES_DIR = os.path.join(BASE_DIR, "datasets", "open_images_sample")
+if not os.path.exists(IMAGES_DIR):
+    os.makedirs(IMAGES_DIR)
+
+app.mount("/extra_images", StaticFiles(directory=IMAGES_DIR), name="images")
+import glob
+
+# Debug: Check presence of JPG files in the directory
+jpg_files = glob.glob(os.path.join(IMAGES_DIR, "*.jpg"))
+if not jpg_files:
+    print(f"❌ No JPG files found in {IMAGES_DIR}")
+else:
+    print(f"✅ Found {len(jpg_files)} JPG files in {IMAGES_DIR}")
+    print("Sample files:", jpg_files[:5])
 # ---- Pydantic Models ----
 class Entry(BaseModel):
     text: str

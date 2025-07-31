@@ -6,3 +6,5 @@ __pycache__/
 extracted_images/
 uploads/
 node_modules/
+datasets/
+lancedb/

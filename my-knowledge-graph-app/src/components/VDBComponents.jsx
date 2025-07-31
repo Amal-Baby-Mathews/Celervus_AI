@@ -17,7 +17,7 @@ const AddEntryForm = ({ onSuccess, onError }) => {
       onSuccess(response.data.message);
       setEntries([{ text: '', image_path: '', file_path: '' }]);
     } catch (err) {
-      onError('Failed to add entries. Please try again.');
+      onError(err.response?.data?.detail || 'Failed to add entries. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -34,12 +34,7 @@ const AddEntryForm = ({ onSuccess, onError }) => {
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.3 }}
-      className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md"
-    >
+    <motion.div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
       <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
         <Upload size={24} className="text-blue-600 dark:text-blue-400 mr-2" /> Add Entries
       </h3>
@@ -69,18 +64,10 @@ const AddEntryForm = ({ onSuccess, onError }) => {
             />
           </div>
         ))}
-        <button
-          type="button"
-          onClick={addEntryField}
-          className="text-blue-600 dark:text-blue-400 hover:underline mb-4"
-        >
+        <button type="button" onClick={addEntryField} className="text-blue-600 dark:text-blue-400 hover:underline mb-4">
           + Add another entry
         </button>
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full px-4 py-2 bg-blue-600 text-white rounded-md shadow-md hover:bg-blue-700 transition-colors duration-200 flex items-center justify-center"
-        >
+        <button type="submit" disabled={loading} className="w-full px-4 py-2 bg-blue-600 text-white rounded-md shadow-md hover:bg-blue-700 transition-colors duration-200 flex items-center justify-center">
           {loading ? <Loader2 size={20} className="animate-spin mr-2" /> : <Upload size={20} className="mr-2" />}
           Submit Entries
         </button>
@@ -96,28 +83,52 @@ const UpdateEntryForm = ({ onSuccess, onError }) => {
 
   const handleUpdate = async (e) => {
     e.preventDefault();
-    if (!where.trim() || !values.text.trim()) return;
-
+  
+    // 1. VALIDATION: Ensure there is a new text value to update.
+    if (!values.text.trim()) {
+      onError('The new "text" value cannot be empty.');
+      return;
+    }
+  
+    // 2. SAFETY CHECK: Warn if where clause is empty (update ALL rows).
+    if (!where.trim()) {
+      const isConfirmed = window.confirm(
+        '⚠️ WARNING: The "where" clause is empty. This will update ALL entries in the database. Are you absolutely sure you want to proceed?'
+      );
+      if (!isConfirmed) {
+        return;
+      }
+    }
+  
     setLoading(true);
     try {
-      const response = await axios.post('http://localhost:8008/db/update', { where, values });
+      // 3. CONDITION FIX: If user enters just a value like "hi",
+      // convert it to "text = 'hi'" for LanceDB.
+      let condition = where.trim();
+      if (condition && !condition.includes('=')) {
+        condition = `text = '${condition}'`;
+      }
+  
+      // 4. Make API request.
+      const response = await axios.post('http://localhost:8008/db/update', {
+        where: condition,
+        values
+      });
+  
+      // 5. Handle success.
       onSuccess(response.data.message);
       setWhere('');
       setValues({ text: '' });
     } catch (err) {
-      onError('Failed to update entries. Please try again.');
+      // Show backend HTTPException details if available
+      onError(err.response?.data?.detail || 'Failed to update entries. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.3 }}
-      className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md"
-    >
+    <motion.div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
       <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
         <Edit size={24} className="text-blue-600 dark:text-blue-400 mr-2" /> Update Entry
       </h3>
@@ -136,11 +147,7 @@ const UpdateEntryForm = ({ onSuccess, onError }) => {
           placeholder="New text value"
           className="w-full px-4 py-2 mb-4 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-600"
         />
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full px-4 py-2 bg-blue-600 text-white rounded-md shadow-md hover:bg-blue-700 transition-colors duration-200 flex items-center justify-center"
-        >
+        <button type="submit" disabled={loading} className="w-full px-4 py-2 bg-blue-600 text-white rounded-md shadow-md hover:bg-blue-700 transition-colors duration-200 flex items-center justify-center">
           {loading ? <Loader2 size={20} className="animate-spin mr-2" /> : <Edit size={20} className="mr-2" />}
           Update Entry
         </button>
@@ -155,29 +162,43 @@ const DeleteEntryForm = ({ onSuccess, onError }) => {
 
   const handleDelete = async (e) => {
     e.preventDefault();
-    if (!condition.trim()) return;
-
+  
+    if (!condition.trim()) {
+      onError('The delete condition cannot be empty.');
+      return;
+    }
+  
+    // If the user entered just a value (like "mol"), make it `text = 'mol'`
+    let formattedCondition = condition.trim();
+    if (!formattedCondition.includes('=')) {
+      formattedCondition = `text = '${formattedCondition}'`;
+    }
+  
+    // Safety warning: If the condition seems too broad
+    if (formattedCondition.toLowerCase() === 'true' || formattedCondition === '') {
+      const confirmDelete = window.confirm(
+        'WARNING: This will delete ALL rows from the database. Are you sure you want to continue?'
+      );
+      if (!confirmDelete) return;
+    }
+  
     setLoading(true);
     try {
       const response = await axios.delete('http://localhost:8008/db/delete', {
-        data: { condition }
+        data: { condition: formattedCondition }
       });
       onSuccess(response.data.message);
       setCondition('');
     } catch (err) {
-      onError('Failed to delete entries. Please try again.');
+      onError(err.response?.data?.detail || 'Failed to delete entries. Please try again.');
     } finally {
       setLoading(false);
     }
   };
+  
 
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.3 }}
-      className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md"
-    >
+    <motion.div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
       <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
         <Trash size={24} className="text-blue-600 dark:text-blue-400 mr-2" /> Delete Entry
       </h3>
@@ -189,11 +210,7 @@ const DeleteEntryForm = ({ onSuccess, onError }) => {
           placeholder="Condition (e.g., text = 'farewell world')"
           className="w-full px-4 py-2 mb-4 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-600"
         />
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full px-4 py-2 bg-red-600 text-white rounded-md shadow-md hover:bg-red-700 transition-colors duration-200 flex items-center justify-center"
-        >
+        <button type="submit" disabled={loading} className="w-full px-4 py-2 bg-red-600 text-white rounded-md shadow-md hover:bg-red-700 transition-colors duration-200 flex items-center justify-center">
           {loading ? <Loader2 size={20} className="animate-spin mr-2" /> : <Trash size={20} className="mr-2" />}
           Delete Entry
         </button>
@@ -202,43 +219,5 @@ const DeleteEntryForm = ({ onSuccess, onError }) => {
   );
 };
 
-const DropTableButton = ({ onSuccess, onError }) => {
-  const [loading, setLoading] = useState(false);
 
-  const handleDrop = async () => {
-    if (!window.confirm('Are you sure you want to drop the entire table? This action cannot be undone.')) return;
-
-    setLoading(true);
-    try {
-      const response = await axios.delete('http://localhost:8008/db/drop');
-      onSuccess(response.data.message);
-    } catch (err) {
-      onError('Failed to drop table. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.3 }}
-      className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md"
-    >
-      <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-        <Database size={24} className="text-blue-600 dark:text-blue-400 mr-2" /> Drop Table
-      </h3>
-      <button
-        onClick={handleDrop}
-        disabled={loading}
-        className="w-full px-4 py-2 bg-red-600 text-white rounded-md shadow-md hover:bg-red-700 transition-colors duration-200 flex items-center justify-center"
-      >
-        {loading ? <Loader2 size={20} className="animate-spin mr-2" /> : <Database size={20} className="mr-2" />}
-        Drop Table
-      </button>
-    </motion.div>
-  );
-};
-
-export { AddEntryForm, UpdateEntryForm, DeleteEntryForm, DropTableButton };
+export { AddEntryForm, UpdateEntryForm, DeleteEntryForm };
