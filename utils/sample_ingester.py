@@ -1,6 +1,7 @@
 import os
 import csv
 import logging
+import uuid
 import requests
 from tqdm import tqdm
 from pathlib import Path
@@ -13,8 +14,8 @@ logger = logging.getLogger(__name__)
 # --- Config ---
 CSV_FILE = "./datasets/open_images_csv/images.csv"
 IMAGE_DIR = "./datasets/open_images_sample"
-START_index=51
-End_index=500
+START_index=501
+End_index=1500
 SAMPLE_SIZE = End_index - START_index + 1  # Total rows to process
 HOST_URL= "http://localhost:8008"  # Adjust if needed
 os.makedirs(IMAGE_DIR, exist_ok=True)
@@ -32,7 +33,7 @@ def main():
                 continue
             if idx > End_index:
                 break
-            logger.debug(f"Row {idx}: {row[0]}")
+            logger.debug(f"Row {idx}: {row}")
 
             original_url = row.get("OriginalURL")
             image_id = row.get("ImageID")
@@ -49,6 +50,7 @@ def main():
 
                 local_path = Path(IMAGE_DIR) / f"{image_id}.jpg"
                 if not local_path.exists():
+                    # continue
                     resp = requests.get(original_url, timeout=10)
                     if resp.status_code == 200:
                         with open(local_path, "wb") as f:
@@ -59,6 +61,7 @@ def main():
                         continue
 
                 entries.append({
+                    "pk": str(uuid.uuid4().hex),
                     "text": description,
                     "image_path": f"{HOST_URL}/extra_images/{local_path.name}",
                     "file_path": str(local_path)

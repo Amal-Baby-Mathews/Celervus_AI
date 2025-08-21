@@ -1,11 +1,12 @@
 import shutil
+import uuid
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
 
 from pydantic import BaseModel, Field
 from pdf_extraactor import PDFKnowledgeGraph
-from fastapi import FastAPI, File, Form, UploadFile, HTTPException
+from fastapi import FastAPI, File, Form, Query, UploadFile, HTTPException
 import uvicorn
 from typing import List, Dict, Optional, Any
 from fastapi.responses import StreamingResponse
@@ -208,6 +209,7 @@ async def add_entry(
 
         # ✅ Prepare entry for DB
         entry = {
+            "pk": str(uuid.uuid4().hex),
             "text": text,
             "file_path": file_path,
             "image_path": saved_image_url
@@ -279,6 +281,36 @@ def drop_table():
     except Exception as e:
         logger.exception(f"Drop table failed: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to drop table: {str(e)}")
+    
+@app.get("/db/image_search_by_pk")
+async def image_search_by_pk_endpoint(pk: str = Query(...), top_k: int = Query(10, ge=1)):
+    """
+    Search images by primary key (pk) using a GET request.
+    - Retrieves the image_vector associated with the pk and performs an image search.
+    - Returns cleaned search results (vectors removed).
+    """
+    try:
+        results = shared_multimodal_db.image_search_by_pk(pk, top_k=top_k)
+        cleaned = []
+        for r in results:
+            cleaned_item = {k: v for k, v in r.items() if k not in ("text_vector", "image_vector")}
+            if cleaned_item.get("image_path") and not cleaned_item["image_path"].startswith("http"):
+                filename = os.path.basename(cleaned_item["image_path"])
+                cleaned_item["image_url"] = f"{BASE_URL}/extra_images/{filename}"
+            cleaned.append(cleaned_item)
+
+        return {
+            "status": "success",
+            "query_pk": pk,
+            "count": len(cleaned),
+            "results": cleaned,
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception(f"Image search by pk endpoint failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Image search failed: {str(e)}")
+
 # Example Usage
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8008)
