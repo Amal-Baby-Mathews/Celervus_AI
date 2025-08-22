@@ -4,7 +4,7 @@ import { Upload, Edit, Trash, Database, Loader2 } from 'lucide-react';
 import axios from 'axios';
 
 const AddEntryForm = ({ onSuccess, onError }) => {
-  const [entries, setEntries] = useState([{ text: '', file_path: '', image: null }]);
+  const [entries, setEntries] = useState([{ text: '', image: null }]);
   const [loading, setLoading] = useState(false);
 
   const handleAddEntry = async (e) => {
@@ -18,7 +18,6 @@ const AddEntryForm = ({ onSuccess, onError }) => {
       // ✅ For now, handle only the first entry (as your API expects one entry)
       const entry = entries[0];
       formData.append('text', entry.text);
-      if (entry.file_path) formData.append('file_path', entry.file_path);
       if (entry.image) formData.append('image', entry.image);
 
       const response = await axios.post('http://localhost:8008/db/add', formData, {

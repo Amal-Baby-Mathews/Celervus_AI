@@ -63,7 +63,7 @@ const SearchPage = () => {
     try {
       // Send GET request to image_search_by_pk endpoint
       const searchResponse = await axios.get('http://localhost:8008/db/image_search_by_pk', {
-        params: { pk, top_k: 3 },
+        params: { pk, top_k: 12 },
         headers: { 'Accept': 'application/json' },
       });
   

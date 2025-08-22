@@ -176,7 +176,6 @@ class DeleteRequest(BaseModel):
 @app.post("/db/add")
 async def add_entry(
     text: str = Form(...),
-    file_path: Optional[str] = Form(None),
     image: Optional[UploadFile] = File(None)
 ):
     """
@@ -187,7 +186,7 @@ async def add_entry(
 
     try:
         # ✅ Default image_path
-        saved_image_path = None
+        save_path = None
 
         # ✅ Save image if provided
         if image:
@@ -211,7 +210,7 @@ async def add_entry(
         entry = {
             "pk": str(uuid.uuid4().hex),
             "text": text,
-            "file_path": file_path,
+            "file_path": save_path,
             "image_path": saved_image_url
         }
 
