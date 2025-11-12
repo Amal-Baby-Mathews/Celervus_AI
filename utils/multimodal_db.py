@@ -15,13 +15,14 @@ import torch
 # Load environment variables with defaults
 DB_URI = os.getenv("LANCEDB_URI", "./lancedb")
 TABLE_NAME = os.getenv("LANCEDB_TABLE", "multimodal_table")
-EMBEDDER_MODEL = os.getenv("EMBEDDER_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
-IMAGE_EMBEDDER_MODEL = os.getenv("IMAGE_EMBEDDER_MODEL", "facebook/dinov2-small-imagenet1k-1-layer")
+embedding_provider = os.getenv("EMBEDDING_PROVIDER", "ollama")  # Default to huggingface
+EMBEDDER_MODEL = os.getenv("EMBEDDER_MODEL", "nomic-embed-text:latest")
+IMAGE_EMBEDDER_MODEL = os.getenv("IMAGE_EMBEDDER_MODEL", "facebook/dinov2-base-imagenet1k-1-layer")
 from logging import getLogger
 import logging
 HF_TOKEN = os.getenv("HF_TOKEN", None)  # Load token from .env, if available
 class DINOv3Embedding:
-    def __init__(self, model_name=IMAGE_EMBEDDER_MODEL, token=HF_TOKEN, dim=384):
+    def __init__(self, model_name=IMAGE_EMBEDDER_MODEL, token=HF_TOKEN, dim=768):
         self.model = AutoModel.from_pretrained(model_name, token=token)
         self.processor = AutoImageProcessor.from_pretrained(model_name, token=token)
         self._ndims = dim
@@ -65,7 +66,10 @@ class MultimodalDB:
         self.logger = getLogger(__name__)
         self.logger.debug(f"Initializing MultimodalDB with URI: {uri}, Table: {table_name}")
         self.db = lancedb.connect(uri)
-        self.embedder = get_registry().get("huggingface").create(name=embedder_model)
+        if embedding_provider=="huggingface":
+            self.embedder = get_registry().get("huggingface").create(name=embedder_model)
+        elif embedding_provider=="ollama":
+            self.embedder = get_registry().get("ollama").create(name=embedder_model)
         self.image_embedder = DINOv3Embedding(model_name=image_embedder_model)
         self.Schema = self.get_schema(self.embedder, image_embedder=self.image_embedder)
 

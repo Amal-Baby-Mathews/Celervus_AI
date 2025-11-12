@@ -50,15 +50,15 @@ def main():
 
                 local_path = Path(IMAGE_DIR) / f"{image_id}.jpg"
                 if not local_path.exists():
-                    # continue
-                    resp = requests.get(original_url, timeout=10)
-                    if resp.status_code == 200:
-                        with open(local_path, "wb") as f:
-                            f.write(resp.content)
-                        logger.info(f"Downloaded image {image_id}")
-                    else:
-                        logger.warning(f"Failed to download {original_url} (status {resp.status_code})")
-                        continue
+                    continue
+                    # resp = requests.get(original_url, timeout=10)
+                    # if resp.status_code == 200:
+                    #     with open(local_path, "wb") as f:
+                    #         f.write(resp.content)
+                    #     logger.info(f"Downloaded image {image_id}")
+                    # else:
+                    #     logger.warning(f"Failed to download {original_url} (status {resp.status_code})")
+                    #     continue
 
                 entries.append({
                     "pk": str(uuid.uuid4().hex),
